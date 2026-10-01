@@ -462,7 +462,7 @@
     var txRef="imgnd_"+planId+"_"+pm.cycle+"_"+u.id+"_"+Date.now();
     var modal=window.FlutterwaveCheckout({
       public_key:cfg.flwPublicKey, tx_ref:txRef, amount:amount, currency:"NGN",
-      payment_options:"card,banktransfer,ussd",
+      payment_options:"card,banktransfer,opay,ussd,account,nqr",
       customer:{email:u.email, name:meta.full_name||meta.name||u.email},
       meta:{user_id:u.id, plan:planId, cycle:pm.cycle},
       customizations:{title:"Imagend "+p.name,
