@@ -35,6 +35,20 @@ async function flwVerify(transactionId) {
   return j.data;
 }
 
+// Look a payment up by our own reference (works even if the customer never came back to the page).
+async function flwVerifyByRef(txRef) {
+  const ref = String(txRef || "");
+  if (!/^imgnd_[a-z]+_[a-z]+_[0-9a-f-]{36}_[0-9]+$/i.test(ref)) throw new Error("missing or invalid reference");
+  const r = await fetch(`https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(ref)}`, {
+    headers: { Authorization: `Bearer ${FLW_SECRET}` },
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.status !== "success" || !j.data) {
+    throw new Error("Flutterwave has no completed payment for this reference yet");
+  }
+  return j.data;
+}
+
 // tx_ref format created by the app: imgnd_<plan>_<cycle>_<userId>_<timestamp>
 function parseTxRef(ref) {
   const parts = String(ref || "").split("_");
@@ -71,8 +85,12 @@ async function applyPayment({ userId, plan, cycle, tx }) {
 }
 
 // Full check: verified by Flutterwave, successful, reference is ours, then apply.
-async function processTransaction(transactionId, expectedUserId) {
-  const tx = await flwVerify(transactionId);
+async function processTransaction(transactionId, expectedUserId, txRef) {
+  if (txRef && expectedUserId) {
+    const own = parseTxRef(txRef);
+    if (!own || own.userId !== expectedUserId) throw new Error("Payment belongs to another account");
+  }
+  const tx = transactionId ? await flwVerify(transactionId) : await flwVerifyByRef(txRef);
   if (tx.status !== "successful") throw new Error(`Payment status is "${tx.status}"`);
   const ref = parseTxRef(tx.tx_ref);
   if (!ref) throw new Error("Not an Imagend payment");
@@ -81,4 +99,4 @@ async function processTransaction(transactionId, expectedUserId) {
   return { ...result, plan: ref.plan, cycle: ref.cycle };
 }
 
-module.exports = { missingEnv, getUserFromToken, flwVerify, parseTxRef, applyPayment, processTransaction };
+module.exports = { missingEnv, getUserFromToken, flwVerify, flwVerifyByRef, parseTxRef, applyPayment, processTransaction };

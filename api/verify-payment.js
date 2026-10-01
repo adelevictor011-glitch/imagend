@@ -1,4 +1,4 @@
-// POST /api/verify-payment   { transaction_id }
+// POST /api/verify-payment   { transaction_id } or { tx_ref }
 // Header: Authorization: Bearer <Supabase access token>
 // Called by the app right after Flutterwave checkout succeeds.
 const { missingEnv, getUserFromToken, processTransaction } = require("./_lib");
@@ -14,7 +14,8 @@ module.exports = async (req, res) => {
     if (!user) return res.status(401).json({ ok: false, error: "Please sign in again" });
 
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
-    const result = await processTransaction(body.transaction_id, user.id);
+    if (!body.transaction_id && !body.tx_ref) return res.status(400).json({ ok: false, error: "Missing payment reference" });
+    const result = await processTransaction(body.transaction_id, user.id, body.tx_ref);
     return res.status(200).json({ ok: true, ...result });
   } catch (e) {
     return res.status(400).json({ ok: false, error: e.message || "Verification failed" });

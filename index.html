@@ -460,6 +460,7 @@
     var u=s.user, meta=u.user_metadata||{};
     pmMsg("Opening secure checkout…");
     var txRef="imgnd_"+planId+"_"+pm.cycle+"_"+u.id+"_"+Date.now();
+    try{localStorage.setItem("imagend:pendingPay",JSON.stringify({ref:txRef,at:Date.now()}));}catch(e){}
     var modal=window.FlutterwaveCheckout({
       public_key:cfg.flwPublicKey, tx_ref:txRef, amount:amount, currency:"NGN",
       payment_options:"card,banktransfer,opay,ussd,account,nqr",
@@ -468,26 +469,45 @@
       customizations:{title:"Imagend "+p.name,
         description:p.name+" · "+(pm.cycle==="yearly"?"1 year":"1 month")+" · "+p.daily_limit+" prompts a day",
         logo:location.origin+"/imagend-icon.png"},
-      callback:function(resp){try{modal&&modal.close&&modal.close();}catch(e){} confirmPayment(resp&&resp.transaction_id);},
+      redirect_url:location.origin+"/?paid=1",
+      callback:function(resp){try{modal&&modal.close&&modal.close();}catch(e){} confirmPayment(resp&&resp.transaction_id, txRef);},
       onclose:function(){ if(document.getElementById("pmMsg").textContent==="Opening secure checkout…") pmMsg(""); }
     });
   }
-  async function confirmPayment(txId){
-    if(!txId){pmMsg("The payment wasn't completed.","err");return;}
+  function clearPending(){try{localStorage.removeItem("imagend:pendingPay");}catch(e){}}
+  async function confirmPayment(txId,txRef,quiet){
+    if(!txId&&!txRef){pmMsg("The payment wasn't completed.","err");return false;}
     pmMsg("Confirming your payment…");
     try{
       var s=await freshSession();
       var r=await fetch("/api/verify-payment",{method:"POST",
         headers:{"Content-Type":"application/json",Authorization:"Bearer "+(s&&s.access_token)},
-        body:JSON.stringify({transaction_id:txId})});
+        body:JSON.stringify(txId?{transaction_id:txId}:{tx_ref:txRef})});
       var j=await r.json().catch(function(){return {};});
       if(!r.ok||!j.ok) throw new Error(j.error||"We couldn't confirm the payment");
+      clearPending();
       await pmLoadStatus(); renderPlans(); refreshFrames();
       pmMsg("✓ Payment confirmed. You're on "+(pm.status?pm.status.plan_name:"your new plan")+" until "+fmtDate(pm.status&&pm.status.until)+".","ok");
+      return true;
     }catch(e){
-      pmMsg(e.message+". If you were charged, your plan switches on automatically within a few minutes. Reference: "+txId+".","err");
+      if(quiet){pmMsg("");return false;}
+      pmMsg(e.message+". If you were charged, your plan switches on automatically within a few minutes"+(txId?". Reference: "+txId:"")+".","err");
       setTimeout(async function(){try{await pmLoadStatus();renderPlans();refreshFrames();}catch(x){}},60000);
+      return false;
     }
+  }
+  /* After a redirect from Flutterwave, or on the next visit, finish any payment we started */
+  var resumed=false;
+  async function resumePendingPayment(){
+    if(resumed) return; resumed=true;
+    var q=new URLSearchParams(location.search), txId=q.get("transaction_id"), ref=q.get("tx_ref"), pending=null;
+    if(q.has("paid")||txId||ref){try{history.replaceState(null,"",location.pathname);}catch(e){}}
+    try{pending=JSON.parse(localStorage.getItem("imagend:pendingPay")||"null");}catch(e){}
+    if(pending&&Date.now()-pending.at>3*24*3600e3){clearPending();pending=null;}
+    if(!txId&&!ref&&!pending) return;
+    if(txId||ref){ await openPlans(); await confirmPayment(txId,ref||(pending&&pending.ref),false); return; }
+    var ok=false; try{ ok=await confirmPayment(null,pending.ref,true); }catch(e){}
+    if(ok){ await openPlans(); pmMsg("✓ Your earlier payment is confirmed. You're on "+(pm.status?pm.status.plan_name:"your new plan")+" until "+fmtDate(pm.status&&pm.status.until)+".","ok"); }
   }
 
   /* ── Listen for postMessages from iframes ── */
@@ -510,6 +530,7 @@
     if(session){
       hideGate();
       broadcastSession(session);
+      setTimeout(resumePendingPayment,1500);
       // Start the app on the last-used world
       if(!loaded[current]) show(current);
       setTimeout(function(){ensureLoaded(current==="image"?"video":"image");},1400);
@@ -523,6 +544,7 @@
     if(r.data&&r.data.session){
       hideGate();
       broadcastSession(r.data.session);
+      setTimeout(resumePendingPayment,1500);
       show(current);
       setTimeout(function(){ensureLoaded(current==="image"?"video":"image");},1400);
     } else {
