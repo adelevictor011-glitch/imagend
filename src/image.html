@@ -1,0 +1,3148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Imagend — Image Prompt Optimizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesque:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root{
+    --bg:#0a0a0d;
+    --bg-2:#101016;
+    --surface:#141420;
+    --inset:#0c0c11;
+    --panel:rgba(22,22,31,0.58);
+    --panel-2:rgba(255,255,255,0.05);
+    --line:rgba(255,255,255,0.06);
+    --line-strong:rgba(255,255,255,0.12);
+    --edge:rgba(255,255,255,0.055);
+    --text:#f4f4f8;
+    --muted:#a2a2b0;
+    --muted-2:#67676f;
+    --accent:#ab90ff;
+    --accent-deep:#7d5cf0;
+    --accent-soft:rgba(171,144,255,0.14);
+    --ok:#5af0b0;
+    --spectrum:linear-gradient(125deg,#a07bff 0%,#ff6fae 52%,#ffb163 100%);
+    --radius:18px;
+    --radius-sm:13px;
+    --radius-xs:9px;
+    --shadow:inset 0 1px 0 0 var(--edge), 0 28px 70px -36px rgba(0,0,0,0.92);
+    --ease:cubic-bezier(.2,.6,.2,1);
+    --ui:'Hanken Grotesque',-apple-system,sans-serif;
+    --display:'Bricolage Grotesque',sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{-webkit-font-smoothing:antialiased}
+  body{
+    font-family:var(--ui);
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    line-height:1.5;
+    position:relative;
+    overflow-x:hidden;
+  }
+  /* atmospheric iris glow + grain */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(55% 45% at 15% -2%,rgba(160,123,255,0.10),transparent 62%),
+      radial-gradient(45% 40% at 88% 6%,rgba(255,111,174,0.07),transparent 62%),
+      radial-gradient(40% 38% at 80% 102%,rgba(255,177,99,0.05),transparent 62%);
+  }
+  body::after{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.32;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+    mix-blend-mode:overlay;
+  }
+  .wrap{position:relative;z-index:1;max-width:1300px;margin:0 auto;padding:38px 28px 80px}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:40px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px}
+  .mark{width:42px;height:42px;border-radius:13px;position:relative;background:var(--surface);border:1px solid var(--line-strong);overflow:hidden;flex:none;display:grid;place-items:center;box-shadow:inset 0 1px 0 var(--edge),0 0 28px -4px rgba(171,144,255,.5)}
+  .mark::before{content:"";width:25px;height:25px;border-radius:50%;background:conic-gradient(from 215deg,#a07bff,#ff6fae,#ffb163,#a07bff)}
+  .mark::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;border-radius:50%;background:var(--bg);box-shadow:0 0 7px 1px rgba(0,0,0,.5),0 0 0 2px rgba(255,255,255,.07)}
+  .brand h1{font-family:var(--display);font-weight:800;font-size:25px;letter-spacing:-.025em;line-height:1}
+  .brand .tag{font-size:12.5px;color:var(--muted);margin-top:4px;letter-spacing:.005em}
+  .credit{font-size:11px;color:var(--muted-2);font-family:var(--mono);letter-spacing:.04em;text-transform:uppercase}
+  .credit b{color:var(--muted);font-weight:500}
+
+  /* ---------- layout ---------- */
+  .grid{display:grid;grid-template-columns:1fr 1.02fr;gap:24px;align-items:start}
+  @media(max-width:920px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);backdrop-filter:blur(20px) saturate(1.1);box-shadow:var(--shadow)}
+  .panel.studio{padding:26px 26px 28px}
+  .panel.output{position:sticky;top:24px;overflow:hidden}
+  @media(max-width:920px){.panel.output{position:static}}
+
+  .sec-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.18em;color:var(--muted-2);font-weight:600;margin-bottom:13px;display:flex;align-items:center;gap:10px}
+  .sec-label::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+
+  /* idea box */
+  .idea-field{position:relative;margin-bottom:24px}
+  textarea#idea{
+    width:100%;min-height:88px;resize:vertical;background:var(--inset);border:1px solid var(--line);
+    border-radius:var(--radius-sm);padding:15px 16px;color:var(--text);font-family:var(--ui);font-size:15px;line-height:1.55;
+    transition:border-color .2s var(--ease),box-shadow .2s var(--ease);box-shadow:inset 0 1px 2px rgba(0,0,0,.35);
+  }
+  textarea#idea::placeholder{color:var(--muted-2)}
+  textarea#idea:focus{outline:none;border-color:var(--accent);box-shadow:inset 0 1px 2px rgba(0,0,0,.35),0 0 0 3px var(--accent-soft)}
+
+  /* category chips */
+  .cats{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:28px}
+  @media(max-width:560px){.cats{grid-template-columns:repeat(3,1fr)}}
+  .cat{cursor:pointer;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:14px 8px 12px;text-align:center;transition:.2s var(--ease);position:relative}
+  .cat:hover{border-color:var(--line-strong);transform:translateY(-2px);background:var(--surface)}
+  .cat .ic{font-size:19px;display:block;margin-bottom:7px;line-height:1;opacity:.92}
+  .cat .nm{font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.005em}
+  .cat.active{border-color:transparent;background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--spectrum) border-box;border:1.5px solid transparent;box-shadow:0 0 20px -8px rgba(171,144,255,.5)}
+  .cat.active .nm{color:var(--text)}
+  .cat.active::after{content:"";position:absolute;inset:0;border-radius:var(--radius-sm);background:var(--spectrum);opacity:.07}
+
+  /* knob groups */
+  .knobs{display:grid;grid-template-columns:1fr 1fr;gap:14px 14px}
+  .knob{display:flex;flex-direction:column;gap:7px}
+  .knob.full{grid-column:1/-1}
+  .knob label{font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.005em}
+  .knob select,.knob input[type=text]{
+    width:100%;background:var(--inset);border:1px solid var(--line);border-radius:var(--radius-xs);padding:10px 12px;color:var(--text);
+    font-family:var(--ui);font-size:13.5px;transition:border-color .18s var(--ease),box-shadow .18s var(--ease);cursor:pointer;box-shadow:inset 0 1px 2px rgba(0,0,0,.3);
+  }
+  .knob select:hover,.knob input:hover{border-color:var(--line-strong)}
+  .knob input[type=text]{cursor:text}
+  .knob select:focus,.knob input:focus{outline:none;border-color:var(--accent);box-shadow:inset 0 1px 2px rgba(0,0,0,.3),0 0 0 3px var(--accent-soft)}
+  .knob select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a2a2b0' stroke-width='2'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+
+  /* segmented control */
+  .seg{display:flex;background:var(--inset);border:1px solid var(--line);border-radius:var(--radius-xs);padding:3px;gap:3px;box-shadow:inset 0 1px 2px rgba(0,0,0,.3)}
+  .seg button{flex:1;background:none;border:none;color:var(--muted);font-family:var(--ui);font-size:12px;font-weight:600;padding:7px 4px;border-radius:6px;cursor:pointer;transition:.16s var(--ease)}
+  .seg button:hover{color:var(--text)}
+  .seg button.on{background:var(--surface);color:var(--text);box-shadow:inset 0 1px 0 var(--edge),0 1px 3px rgba(0,0,0,.4)}
+
+  /* inspire strip */
+  .inspire{margin:4px 0 26px}
+  .insp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
+  .insp-title{font-size:10.5px;text-transform:uppercase;letter-spacing:.18em;color:var(--muted-2);font-weight:600}
+
+  /* ---- collapsible sections (card + neutral/red/green status) ---- */
+  .csec{border:1px solid var(--line);border-radius:var(--radius-sm);padding:13px 16px;margin-bottom:14px;background:var(--bg-2);transition:border-color .3s var(--ease),box-shadow .3s var(--ease)}
+  /* neutral = calm to-do, no alarm (first visit / before engaging) */
+  .csec.is-neutral{border-color:var(--line);box-shadow:none}
+  /* pending = red, only once the user has started and left this incomplete */
+  .csec.is-pending{border-color:rgba(226,75,74,.5);box-shadow:0 0 0 1px rgba(226,75,74,.16),0 0 20px -5px rgba(226,75,74,.55)}
+  .csec.is-done{border-color:rgba(29,158,117,.5);box-shadow:0 0 0 1px rgba(29,158,117,.16),0 0 16px -7px rgba(29,158,117,.45)}
+  @keyframes pendpulse{0%,100%{box-shadow:0 0 0 1px rgba(226,75,74,.16),0 0 14px -6px rgba(226,75,74,.4)}50%{box-shadow:0 0 0 1px rgba(226,75,74,.28),0 0 26px -4px rgba(226,75,74,.7)}}
+  .csec.is-pending.is-collapsed{animation:pendpulse 2.6s var(--ease) infinite}
+  @media(prefers-reduced-motion:reduce){.csec.is-pending.is-collapsed{animation:none}}
+
+  .sec-head-row{display:flex;align-items:center;gap:10px}
+  .sec-head{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;flex:1;min-width:0;background:none;border:none;text-align:left;padding:0;font:inherit;color:inherit}
+  .sec-head:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:6px}
+  .sec-head .sec-titles{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .sec-head .chev{flex:none;width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);transition:transform .25s var(--ease)}
+  .sec-head .chev svg{width:14px;height:14px}
+  .sec-head:hover .chev{color:var(--text)}
+  [data-collapsible].is-collapsed .sec-head .chev{transform:rotate(-90deg)}
+  .sec-body{overflow:hidden;transition:max-height .34s var(--ease),opacity .26s var(--ease),margin .26s var(--ease),transform .3s var(--ease)}
+  .csec .sec-body{margin-top:13px}
+  [data-collapsible].is-collapsed .sec-body{max-height:0!important;opacity:0;margin-top:0!important;margin-bottom:0!important;pointer-events:none;transform:translateY(-6px)}
+  .sec-head .count-badge{flex:none;font-family:var(--mono);font-size:10px;color:var(--muted-2);background:var(--surface);border:1px solid var(--line);padding:2px 8px;border-radius:20px}
+
+  /* done toggle pill — muted grey when neutral, red when pending, green when done */
+  .done-toggle{flex:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;font-weight:600;color:var(--muted-2);border:1px solid var(--line);background:var(--surface);padding:5px 10px;border-radius:20px;transition:.2s var(--ease)}
+  .done-toggle:hover{filter:brightness(1.12)}
+  .csec.is-pending .done-toggle{color:#ff8fa3;border-color:rgba(226,75,74,.45);background:rgba(226,75,74,.08)}
+  .csec.is-done .done-toggle{color:#3ad08a;border-color:rgba(29,158,117,.5);background:rgba(29,158,117,.12)}
+  .done-toggle input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+  .done-toggle .dot{width:13px;height:13px;border-radius:50%;border:1.5px solid currentColor;display:inline-flex;align-items:center;justify-content:center;font-size:9px;line-height:1}
+  .csec.is-done .done-toggle .dot::after{content:"✓"}
+  .done-toggle:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* sections that opted out of the glow system entirely */
+  .csec.no-glow{box-shadow:none;border-color:var(--line)}
+
+  /* optimized-prompt action state: green ring once you've copied or saved THIS prompt */
+  .csec[data-done-mode="action"].is-acted{border-color:rgba(29,158,117,.5);box-shadow:0 0 0 1px rgba(29,158,117,.16),0 0 16px -7px rgba(29,158,117,.45)}
+  .last-action{flex:none;display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;font-weight:600;color:#3ad08a;border:1px solid rgba(29,158,117,.5);background:rgba(29,158,117,.12);padding:4px 9px;border-radius:20px}
+  .last-action[hidden]{display:none}
+  /* the copy/save icon that was used last glows green */
+  .copy.acted{color:var(--ok)!important;border-color:rgba(29,158,117,.55)!important}
+
+  /* hero: click to read more */
+  .hero{padding:0}
+  .hero .sec-head{align-items:flex-start}
+  .hero-tagline{font-size:14px;color:var(--muted);line-height:1.5;margin-top:8px;display:block}
+  .hero-tagline b{color:var(--text);font-weight:600}
+  .readmore{color:var(--accent);font-weight:600;white-space:nowrap}
+  .hero:not(.is-collapsed) .readmore{display:none}
+  .hero .chev{margin-top:6px}
+
+  /* next step — compact, no glow, sits just under the prompt header */
+  .next-step{display:flex;align-items:center;gap:9px;background:var(--accent-soft);border:1px solid rgba(171,144,255,.28);border-radius:var(--radius-xs);padding:8px 12px;margin-bottom:14px}
+  .ns-badge{flex:none;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:#1a1530;background:var(--accent);padding:3px 7px;border-radius:5px}
+  .ns-body{font-size:12.5px;line-height:1.45;color:#d8cff6}
+  .ns-body b{color:#fff;font-weight:600}
+  .surprise{background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--spectrum) border-box;border:1.5px solid transparent;color:var(--text);font-family:var(--ui);font-weight:600;font-size:12.5px;padding:8px 15px;border-radius:var(--radius-xs);cursor:pointer;transition:.18s var(--ease);white-space:nowrap}
+  .surprise:hover{transform:translateY(-1px);box-shadow:0 10px 26px -12px rgba(171,144,255,.6)}
+  .surprise:active{transform:translateY(0)}
+  .sparks{display:flex;flex-wrap:wrap;gap:8px}
+  .spark{background:var(--bg-2);border:1px solid var(--line);color:var(--muted);font-family:var(--ui);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:20px;cursor:pointer;transition:.16s var(--ease)}
+  .spark:hover{border-color:var(--line-strong);color:var(--text);transform:translateY(-1px);background:var(--surface)}
+  .spark.on{border:1.5px solid transparent;background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--spectrum) border-box;color:var(--text);box-shadow:0 0 16px -8px rgba(171,144,255,.5)}
+
+  /* lock toggles */
+  .idea-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:11px}
+  .klab{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .lock{background:none;border:none;cursor:pointer;color:var(--muted-2);padding:1px;display:inline-flex;align-items:center;border-radius:5px;transition:.15s;line-height:0}
+  .lock:hover{color:var(--muted)}
+  .lock svg{width:13px;height:13px}
+  .lock.on{color:var(--accent)}
+  .knob.locked select,.knob.locked input{border-color:rgba(171,144,255,.42);box-shadow:inset 0 0 0 1px rgba(171,144,255,.16)}
+  .knob.locked .seg{box-shadow:inset 0 0 0 1px rgba(171,144,255,.3)}
+  .idea-field.locked textarea{border-color:rgba(171,144,255,.42);box-shadow:inset 0 0 0 1px rgba(171,144,255,.16)}
+
+  /* reference image */
+  .ref-block{margin-bottom:24px;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:13px 15px}
+  .ref-head{display:flex;align-items:center;justify-content:space-between}
+  .switch{position:relative;display:inline-block;width:38px;height:22px;cursor:pointer}
+  .switch input{opacity:0;width:0;height:0;position:absolute}
+  .switch .track{position:absolute;inset:0;background:var(--line-strong);border-radius:20px;transition:.2s}
+  .switch .track::before{content:"";position:absolute;height:16px;width:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .switch input:checked+.track{background:var(--accent-deep)}
+  .switch input:checked+.track::before{transform:translateX(16px)}
+  .ref-body{margin-top:13px}
+  .ref-drop{position:relative;border:1.5px dashed var(--line-strong);border-radius:var(--radius-sm);min-height:96px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;transition:.18s;background:rgba(255,255,255,.015)}
+  .ref-drop:hover{border-color:var(--accent)}
+  .ref-drop.drag{border-color:var(--accent);background:rgba(184,140,255,.08)}
+  .ref-drop img{display:none;max-width:100%;max-height:200px;border-radius:8px}
+  .ref-drop.has img{display:block}
+  .ref-drop.has .ref-placeholder{display:none}
+  .ref-placeholder{text-align:center;color:var(--muted-2);font-size:13px;font-weight:500;padding:14px;display:flex;flex-direction:column;gap:5px}
+  .ref-placeholder span{font-size:10.5px;font-family:var(--mono);color:var(--muted-2);max-width:240px}
+  .ref-clear{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:7px;background:rgba(0,0,0,.5);border:1px solid var(--line-strong);color:#fff;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
+  .ref-clear:hover{background:rgba(0,0,0,.75)}
+
+  /* history rail */
+  .history{position:relative;z-index:1;max-width:1320px;margin:24px auto 0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);backdrop-filter:blur(14px);padding:16px 18px;box-shadow:var(--shadow)}
+  .history .insp-title{display:block;margin-bottom:13px}
+  .hist-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:5px;scrollbar-width:thin}
+  .hist-row::-webkit-scrollbar{height:6px}
+  .hist-row::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:6px}
+  .hist-empty{font-family:var(--mono);font-size:12.5px;color:var(--muted-2)}
+  .hcard{flex:none;width:160px;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 13px;cursor:pointer;transition:.18s var(--ease);box-shadow:inset 0 1px 0 var(--edge)}
+  .hcard:hover{border-color:var(--line-strong);transform:translateY(-2px);background:var(--surface)}
+  .hcard.on{border:1.5px solid transparent;background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--spectrum) border-box;box-shadow:0 0 18px -8px rgba(171,144,255,.5)}
+  .hc-top{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+  .hc-ic{font-size:14px;line-height:1}
+  .hc-name{font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hc-meta{font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .style-wrap{margin-top:28px}
+
+  /* ---------- output ---------- */
+  .out-head{padding:24px 24px 0}
+  .out-head .sec-label{margin-bottom:16px}
+  .models{display:flex;flex-wrap:wrap;background:var(--inset);border:1px solid var(--line);border-radius:var(--radius-sm);padding:4px;gap:3px;margin-bottom:6px;box-shadow:inset 0 1px 2px rgba(0,0,0,.3)}
+  .models button{flex:1 1 auto;min-width:88px;background:none;border:none;cursor:pointer;color:var(--muted);font-family:var(--ui);font-weight:600;font-size:12.5px;padding:10px 6px;border-radius:var(--radius-xs);transition:.18s var(--ease);position:relative}
+  .models button:hover{color:var(--text)}
+  .models button .sub{display:block;font-size:10px;font-weight:500;color:var(--muted-2);margin-top:2px}
+  .models button.on{color:var(--text);background:var(--surface);box-shadow:inset 0 1px 0 var(--edge),0 2px 6px rgba(0,0,0,.4)}
+  .models button.on .sub{color:var(--muted)}
+  .models button.on::before{content:"";position:absolute;left:50%;transform:translateX(-50%);width:22px;bottom:5px;height:2px;border-radius:2px;background:var(--spectrum)}
+  .rec{position:absolute;top:6px;right:8px;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--bg);background:var(--accent);padding:1.5px 5px;border-radius:20px;font-weight:700;opacity:0;transition:.2s}
+  .models button.rec-on .rec{opacity:1}
+
+  .out-body{padding:20px 24px 24px}
+  .user-pill{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;color:var(--muted);flex-wrap:wrap}
+  .up-email{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+  .up-pro{color:#ffd166;font-weight:700;font-size:10px;letter-spacing:.05em}
+  .up-free{color:var(--muted);font-size:10px}
+  .up-signout{background:none;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:var(--mono)}
+  .up-signout:hover{border-color:var(--accent);color:var(--accent)}
+  .gen-gate{background:linear-gradient(160deg,rgba(171,144,255,.08),rgba(171,144,255,.02));border:1px solid rgba(171,144,255,.25);border-radius:var(--radius-sm);padding:26px 22px;text-align:center;margin-bottom:14px}
+  .gate-code-row{display:flex;gap:8px;justify-content:center;margin-top:12px}
+  .gate-code-input{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-family:var(--mono);font-size:12px;color:var(--text);width:170px;outline:none}
+  .gate-code-input:focus{border-color:var(--accent)}
+  .gate-code-btn{background:rgba(171,144,255,.15);border:1px solid rgba(171,144,255,.3);border-radius:8px;padding:8px 14px;font-family:var(--mono);font-size:12px;color:var(--accent);cursor:pointer}
+  .gate-code-btn:hover{background:rgba(171,144,255,.25)}
+  .prompt-box{position:relative;background:var(--inset);border:1px solid var(--line);border-radius:var(--radius-sm);padding:18px 18px 17px;box-shadow:inset 0 1px 3px rgba(0,0,0,.4)}
+  .prompt-box::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:2px;border-radius:2px;background:var(--spectrum);opacity:.55}
+  .prompt-box .blab{font-size:10px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted-2);font-weight:600;margin-bottom:11px}
+  #promptText{font-family:var(--mono);font-size:13px;line-height:1.7;color:#e4e4ee;white-space:pre-wrap;word-break:break-word;min-height:40px}
+  #promptText .em{color:var(--accent)}
+  #promptText .neg{color:#ff8fa3}
+  #promptText .par{color:#ffcf8a}
+  .copy{position:absolute;top:13px;right:13px;background:var(--surface);border:1px solid var(--line-strong);color:var(--muted);width:33px;height:33px;border-radius:var(--radius-xs);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.18s var(--ease)}
+  .copy:hover{color:var(--text);border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .copy svg{width:15px;height:15px}
+  .copy.done{color:var(--ok);border-color:var(--ok)}
+
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+  .chip{font-family:var(--mono);font-size:10.5px;background:var(--bg-2);border:1px solid var(--line);color:var(--muted);padding:5px 10px;border-radius:7px;letter-spacing:.01em}
+  .chip b{color:var(--text);font-weight:600}
+
+  .neg-box{margin-top:14px;background:rgba(255,94,126,.04);border:1px solid rgba(255,94,126,.14);border-radius:var(--radius-sm);padding:13px 15px;transition:opacity .2s var(--ease)}
+  .neg-box.off{opacity:.5}
+  .neg-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
+  .neg-box .blab{color:#ff8fa3;font-size:10px;text-transform:uppercase;letter-spacing:.15em;font-weight:600;margin-bottom:0}
+  .neg-switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+  .neg-cap{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;font-weight:600;color:var(--muted-2)}
+  .switch.sm{width:34px;height:20px}
+  .switch.sm .track::before{height:14px;width:14px}
+  .switch.sm input:checked+.track::before{transform:translateX(14px)}
+  .neg-box .ntext{font-family:var(--mono);font-size:12px;color:#e7c2c9;line-height:1.5;word-break:break-word}
+
+  .fix-box{margin-top:14px;background:var(--accent-soft);border:1px solid rgba(171,144,255,.28);border-radius:var(--radius-sm);padding:13px 15px}
+  .fix-box .blab{color:var(--accent);font-size:10px;text-transform:uppercase;letter-spacing:.15em;font-weight:600;margin-bottom:7px}
+  .fix-box .ftext{font-family:var(--mono);font-size:11.5px;color:#d8cff6;line-height:1.65;word-break:break-word}
+
+  .why{margin-top:16px;font-size:12.5px;color:var(--muted);line-height:1.6;padding-left:14px;border-left:2px solid var(--line-strong)}
+  .why b{color:var(--text);font-weight:600}
+
+  .empty{color:var(--muted-2);font-family:var(--mono);font-size:13px;line-height:1.6}
+
+  /* entrance */
+  .panel{animation:rise .7s var(--ease) both}
+  .panel.output{animation-delay:.1s}
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .knob,.cat{animation:fade .45s ease both}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+  }
+
+  footer{margin-top:32px;text-align:center;font-size:11px;color:var(--muted-2);font-family:var(--mono);letter-spacing:.03em}
+
+  /* ---------- hero strip ---------- */
+  .hero{margin:-8px 0 36px;max-width:880px}
+  .hero h2{font-family:var(--display);font-weight:800;font-size:clamp(26px,4.6vw,46px);letter-spacing:-.03em;line-height:1.07;margin:0}
+  .hero .sec-body{margin-top:12px}
+  .history .sec-body,.proof .sec-body,.globe-sec .sec-body{margin-top:13px}
+  .hero h2 em{font-style:normal;background:var(--spectrum);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{margin-top:10px;color:var(--muted);font-size:15px;line-height:1.55;max-width:640px}
+  .hero-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .hero-chips span{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg-2);border:1px solid var(--line);padding:6px 12px;border-radius:20px;letter-spacing:.02em;box-shadow:inset 0 1px 0 var(--edge)}
+  @media(max-width:560px){.hero{margin:-4px 0 26px}.hero p{font-size:13px}.hero-chips span{font-size:10px;padding:5px 10px}}
+
+  /* dialect hint */
+  .hint{display:flex;align-items:center;gap:9px;margin:2px 0 10px;font-size:12px;color:var(--muted);background:var(--accent-soft);border:1px solid rgba(171,144,255,.3);border-radius:20px;padding:6px 7px 6px 13px;width:fit-content;animation:fade .45s ease both}
+  .hint b{color:var(--text);font-weight:600}
+  .hint button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;width:18px;height:18px;border-radius:50%;line-height:1;flex:none}
+  .hint button:hover{color:var(--text)}
+  .hint[hidden]{display:none}
+
+  /* save-to-library button beside copy */
+  .copy.savebtn{right:52px}
+  .copy.savebtn.done{color:var(--ok);border-color:var(--ok)}
+
+  /* output actions row */
+  .out-actions{display:flex;gap:10px;margin-top:18px}
+  .out-actions button{flex:1;font-family:var(--ui);font-weight:600;font-size:12.5px;padding:11px 10px;border-radius:var(--radius-xs);cursor:pointer;transition:.18s var(--ease)}
+  .act-ghost{background:var(--bg-2);border:1px solid var(--line);color:var(--muted)}
+  .act-ghost:hover{border-color:var(--line-strong);color:var(--text);transform:translateY(-1px)}
+  .act-share{background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--spectrum) border-box;border:1.5px solid transparent;color:var(--text)}
+  .act-share:hover{transform:translateY(-1px);box-shadow:0 10px 26px -12px rgba(171,144,255,.6)}
+
+  /* brand kit panel */
+  .brand-kit{margin-top:28px;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:13px 15px}
+  .bk-note{margin-top:11px;font-family:var(--mono);font-size:10.5px;color:var(--muted-2);line-height:1.5}
+
+  /* library rail */
+  .hcard.lib{width:188px}
+  .hcard.lib .hc-top{gap:6px}
+  .hcard.lib .hc-name{flex:1}
+  .lib-btn{background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:11px;padding:2px 3px;border-radius:5px;line-height:1;flex:none;transition:.15s}
+  .lib-btn:hover{color:var(--text)}
+  .lib-rename{flex:1;min-width:0;background:var(--inset);border:1px solid var(--accent);border-radius:6px;color:var(--text);font-family:var(--ui);font-size:12px;font-weight:600;padding:2px 6px;outline:none}
+
+  /* today's style chip */
+  .spark.today{font-family:var(--mono);font-size:11px;letter-spacing:.01em}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);z-index:60;background:var(--surface);border:1px solid var(--line-strong);color:var(--text);font-size:13px;font-weight:600;padding:11px 18px;border-radius:12px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s var(--ease),transform .25s var(--ease);max-width:88vw;text-align:center}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* ---- hero additions ---- */
+  .hero-lead{margin-top:12px}
+  .hero-lead b{color:var(--text);font-weight:700}
+  .hero-jobs{margin-top:9px;color:var(--muted);font-size:14px;line-height:1.5}
+  .hero-jobs b{color:var(--text);font-weight:600}
+  .hero-chips .chip-emph{font-family:var(--ui);font-weight:600;color:var(--text);background:linear-gradient(var(--bg-2),var(--bg-2)) padding-box,var(--spectrum) border-box;border:1.5px solid transparent;letter-spacing:0}
+  .hero-chips #countChip{font-family:var(--ui);font-weight:600;color:var(--accent);background:var(--accent-soft);border-color:rgba(171,144,255,.3)}
+
+  /* idea micro-CTA */
+  .idea-cta{font-size:12.5px;color:var(--accent);font-weight:500;margin:0 0 9px;letter-spacing:.01em}
+
+  /* next-step styling lives in the collapsible section above */
+
+  /* ---- reviews / testimonials ---- */
+  .proof{margin-top:34px}
+  .proof-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .proof-count{font-family:var(--mono);font-size:11.5px;color:var(--accent)}
+  .reviews{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+  .review{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:15px 16px;position:relative}
+  .review .stars{color:var(--accent);font-size:12px;letter-spacing:2px;margin-bottom:8px}
+  .review .rq{font-size:13.5px;line-height:1.55;color:var(--text)}
+  .review .rby{margin-top:11px;font-size:11.5px;color:var(--muted-2);font-family:var(--mono)}
+  .review .sample-tag{position:absolute;top:11px;right:12px;font-family:var(--mono);font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted-2);border:1px solid var(--line);padding:2px 6px;border-radius:5px}
+
+  /* ---- globe of pins ---- */
+  .globe-sec{margin-top:40px}
+  .globe-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+  .globe-sub-lite{font-size:12px;color:var(--muted);display:block;margin-top:3px}
+  .globe-submit-row{text-align:right;margin-bottom:6px}
+  .globe-submit-row a{font-size:12px;color:var(--accent);text-decoration:none;font-weight:600}
+  .globe-submit-row a:hover{text-decoration:underline}
+  .globe-stage{position:relative;width:100%;max-width:420px;margin:8px auto 0;aspect-ratio:1/1}
+  #globe{width:100%;height:100%;display:block;cursor:grab}
+  #globe:active{cursor:grabbing}
+  .pin-layer{position:absolute;inset:0;pointer-events:none}
+  .pin{position:absolute;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;border:2px solid #fff;background:var(--accent);box-shadow:0 0 0 2px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.4);cursor:pointer;pointer-events:auto;transition:transform .15s var(--ease)}
+  .pin:hover,.pin:focus{transform:scale(1.35);z-index:3;outline:none}
+  .pin.behind{opacity:.18;pointer-events:none}
+  .pin .pin-thumb{position:absolute;inset:1px;border-radius:50%;object-fit:cover;width:calc(100% - 2px);height:calc(100% - 2px)}
+  .job-card{position:absolute;inset:0;margin:auto;width:min(86%,300px);height:max-content;max-height:96%;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;z-index:5;animation:fade .25s var(--ease) both}
+  .job-close{position:absolute;top:9px;right:9px;z-index:2;width:28px;height:28px;border-radius:50%;border:none;background:rgba(8,8,14,.55);color:#fff;font-size:13px;cursor:pointer;backdrop-filter:blur(4px)}
+  .job-close:hover{background:rgba(8,8,14,.8)}
+  .job-img{width:100%;aspect-ratio:4/3;background:var(--inset) center/cover no-repeat}
+  .job-meta{padding:13px 15px 15px}
+  .job-loc{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:5px}
+  .job-cap{font-size:13.5px;line-height:1.45;color:var(--text)}
+  .job-by{margin-top:8px;font-size:11px;color:var(--muted-2);font-family:var(--mono)}
+  @media(prefers-reduced-motion:reduce){#globe{animation:none}}
+  /* ===== portal switch ===== */
+  .portal-tab{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:60;display:flex;flex-direction:column;align-items:center;gap:5px;
+    background:linear-gradient(160deg,rgba(30,24,54,.96),rgba(18,14,34,.96));border:1px solid var(--line-strong);border-right:none;
+    border-radius:16px 0 0 16px;padding:14px 11px 14px 13px;cursor:pointer;color:var(--text);box-shadow:-8px 0 30px -12px rgba(0,0,0,.7);
+    backdrop-filter:blur(8px);transition:transform .25s var(--ease),box-shadow .25s var(--ease),padding .25s var(--ease)}
+  .portal-tab:hover{transform:translateY(-50%) translateX(-4px);box-shadow:-14px 0 40px -10px rgba(171,144,255,.5);padding-right:16px}
+  .portal-tab:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .portal-tab-icon{font-size:20px;line-height:1;filter:drop-shadow(0 0 8px rgba(171,144,255,.5))}
+  .portal-tab-label{font-family:var(--mono);font-size:9px;line-height:1.15;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:center}
+  .portal-tab-arrow{font-size:13px;color:var(--accent);transition:transform .25s var(--ease)}
+  .portal-tab:hover .portal-tab-arrow{transform:translateX(3px)}
+  @media(max-width:560px){.portal-tab{padding:10px 7px 10px 9px}.portal-tab-icon{font-size:17px}.portal-tab-label{font-size:8px}}
+
+  .portal-veil{position:fixed;inset:0;z-index:200;pointer-events:none;display:flex;align-items:center;justify-content:center;opacity:0}
+  .portal-veil .portal-iris{position:absolute;left:50%;top:50%;width:40px;height:40px;border-radius:50%;
+    transform:translate(-50%,-50%) scale(0);background:radial-gradient(circle at 50% 50%, #ff6fae 0%, #a07bff 45%, #0c0a1a 78%);
+    box-shadow:0 0 80px 20px rgba(171,144,255,.6)}
+  .portal-veil .portal-word{position:relative;z-index:2;font-family:var(--display);font-weight:800;font-size:34px;letter-spacing:-.02em;color:#fff;opacity:0;transform:scale(.9)}
+  .portal-veil.opening{opacity:1;transition:opacity .15s linear}
+  .portal-veil.opening .portal-iris{transition:transform .55s cubic-bezier(.7,0,.3,1);transform:translate(-50%,-50%) scale(60)}
+  .portal-veil.opening .portal-word{transition:opacity .3s ease .2s,transform .4s ease .2s;opacity:1;transform:scale(1)}
+  .portal-veil.arrived{opacity:1}
+  .portal-veil.arrived .portal-iris{transform:translate(-50%,-50%) scale(60)}
+  .portal-veil.arrived .portal-word{opacity:1;transform:scale(1)}
+  .portal-veil.closing{opacity:0;transition:opacity .5s ease .35s}
+  .portal-veil.closing .portal-iris{transition:transform .6s cubic-bezier(.6,0,.2,1);transform:translate(-50%,-50%) scale(0)}
+  .portal-veil.closing .portal-word{transition:opacity .3s ease;opacity:0}
+  @media(prefers-reduced-motion:reduce){
+    .portal-veil .portal-iris,.portal-veil .portal-word{transition:none!important}
+    .portal-veil.opening{transition:opacity .2s linear}
+  }
+
+  /* ---- fast-start / first-run utility controls ---- */
+  .fast-start{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+  .fast-primary,.fast-ghost{border-radius:12px;padding:11px 15px;font-family:var(--ui);font-size:13px;font-weight:700;cursor:pointer;transition:.18s var(--ease)}
+  .fast-primary{border:1px solid rgba(171,144,255,.45);color:#fff;background:linear-gradient(135deg,rgba(171,144,255,.24),rgba(255,111,174,.15));box-shadow:0 0 24px -12px rgba(171,144,255,.7)}
+  .fast-primary:hover{transform:translateY(-1px);border-color:var(--accent);box-shadow:0 8px 26px -13px rgba(171,144,255,.9)}
+  .fast-ghost{border:1px solid var(--line);color:var(--muted);background:var(--bg-2)}
+  .fast-ghost:hover{color:var(--text);border-color:var(--line-strong)}
+  .fast-spacer{flex:1}
+  .fast-note{font-size:11px;color:var(--muted-2);font-family:var(--mono)}
+  @media(max-width:560px){.fast-start>*{flex:1}.fast-spacer,.fast-note{display:none}.fast-start button{white-space:nowrap}}
+
+  /* ---- prompt preview + editable copy ---- */
+  .prompt-modebar{display:flex;align-items:center;gap:7px;margin:0 0 10px}
+  .prompt-tab{border:1px solid var(--line);background:var(--bg-2);color:var(--muted);border-radius:8px;padding:6px 9px;font:600 11px var(--ui);cursor:pointer}
+  .prompt-tab.on{color:var(--text);border-color:rgba(171,144,255,.45);background:rgba(171,144,255,.1)}
+  .prompt-status{margin-left:auto;font:600 9px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted-2)}
+  .prompt-status.edited{color:#ffd38f}
+  #promptEdit{display:none;width:100%;min-height:210px;resize:vertical;background:transparent;border:0;outline:0;color:var(--text);font:13px/1.65 var(--mono);padding:2px 0}
+  .prompt-edit-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .prompt-edit-actions button{border:1px solid var(--line);background:var(--bg-2);color:var(--muted);border-radius:9px;padding:7px 10px;font:600 11px var(--ui);cursor:pointer}
+  .prompt-edit-actions button:hover{color:var(--text);border-color:var(--line-strong)}
+  .breakdown-grid{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:4px}
+  .breakdown-item{border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.025);padding:9px 10px}
+  .breakdown-item span{display:block;font:600 9px var(--mono);text-transform:uppercase;letter-spacing:.09em;color:var(--muted-2);margin-bottom:4px}
+  .breakdown-item b{display:block;font:600 12px var(--ui);color:var(--text)}
+  @media(max-width:560px){.breakdown-grid{grid-template-columns:1fr}}
+
+  /* ---- how-to-use modal ---- */
+  .howto-backdrop{position:fixed;inset:0;z-index:550;background:rgba(5,5,10,.78);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px}
+  .howto-backdrop.open{display:flex}
+  .howto-card{width:min(560px,100%);background:linear-gradient(160deg,rgba(20,20,32,.99),rgba(12,10,26,.99));border:1px solid var(--line-strong);border-radius:22px;padding:25px;box-shadow:0 30px 90px rgba(0,0,0,.65)}
+  .howto-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+  .howto-title{font:800 24px var(--display);letter-spacing:-.02em}
+  .howto-close{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--bg-2);color:var(--muted);cursor:pointer;font-size:18px}
+  .howto-sub{color:var(--muted);font-size:13px;line-height:1.55;margin-bottom:18px}
+  .howto-steps{display:grid;gap:10px}
+  .howto-step{display:grid;grid-template-columns:30px 1fr;gap:11px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025)}
+  .howto-num{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:rgba(171,144,255,.14);color:var(--accent);font:700 11px var(--mono)}
+  .howto-step b{display:block;font-size:13px;margin-bottom:2px}.howto-step p{margin:0;color:var(--muted);font-size:12px;line-height:1.45}
+  .howto-aha{margin-top:17px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  .howto-aha .fast-primary{flex:1}
+
+
+  /* ---- Lazy Guide: beginner-first adaptive interview ---- */
+  .lazy-backdrop{position:fixed;inset:0;z-index:560;background:rgba(5,5,10,.8);backdrop-filter:blur(11px);display:none;align-items:center;justify-content:center;padding:20px}
+  .lazy-backdrop.open{display:flex}
+  .lazy-card{width:min(620px,100%);max-height:min(760px,92vh);overflow:auto;background:linear-gradient(160deg,rgba(20,20,32,.995),rgba(12,10,26,.995));border:1px solid var(--line-strong);border-radius:22px;padding:25px;box-shadow:0 34px 100px rgba(0,0,0,.7)}
+  .lazy-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:8px}
+  .lazy-eyebrow{font:700 9px var(--mono);text-transform:uppercase;letter-spacing:.14em;color:var(--accent);margin-bottom:5px}
+  .lazy-title{font:800 25px var(--display);letter-spacing:-.025em;line-height:1.06}
+  .lazy-close{flex:none;width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--bg-2);color:var(--muted);cursor:pointer;font-size:18px}
+  .lazy-progress{height:3px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden;margin:18px 0 20px}.lazy-progress span{display:block;height:100%;width:20%;background:var(--spectrum);border-radius:99px;transition:width .24s var(--ease)}
+  .lazy-qnum{font:600 10px var(--mono);color:var(--muted-2);text-transform:uppercase;letter-spacing:.11em;margin-bottom:8px}
+  .lazy-question{font:700 20px/1.25 var(--display);margin-bottom:7px;color:var(--text)}
+  .lazy-help{font:13px/1.5 var(--ui);color:var(--muted);margin-bottom:16px}
+  .lazy-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .lazy-option{min-height:54px;text-align:left;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:rgba(255,255,255,.025);color:var(--text);font:600 12.5px/1.35 var(--ui);cursor:pointer;transition:.16s var(--ease)}
+  .lazy-option:hover{border-color:rgba(171,144,255,.4);background:rgba(171,144,255,.07);transform:translateY(-1px)}
+  .lazy-option.on{border-color:rgba(171,144,255,.7);background:rgba(171,144,255,.13);box-shadow:0 0 18px -10px rgba(171,144,255,.8)}
+  .lazy-input{width:100%;min-height:105px;resize:vertical;background:var(--inset);border:1px solid var(--line);border-radius:12px;padding:13px 14px;color:var(--text);font:14px/1.5 var(--ui);outline:0}.lazy-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .lazy-text-input{width:100%;background:var(--inset);border:1px solid var(--line);border-radius:10px;padding:11px 12px;color:var(--text);font:13px var(--ui);outline:0;margin-top:9px}.lazy-text-input:focus{border-color:var(--accent)}
+  .lazy-actions{display:flex;align-items:center;gap:9px;margin-top:18px}.lazy-actions .fast-primary{margin-left:auto}.lazy-back{border:0;background:transparent;color:var(--muted);font:600 12px var(--ui);cursor:pointer;padding:8px 2px}.lazy-back:hover{color:var(--text)}
+  .lazy-summary{display:grid;gap:8px;margin-top:14px}.lazy-summary-row{display:grid;grid-template-columns:110px 1fr;gap:10px;border:1px solid var(--line);background:rgba(255,255,255,.022);border-radius:10px;padding:9px 10px}.lazy-summary-row span{font:600 9px var(--mono);text-transform:uppercase;letter-spacing:.09em;color:var(--muted-2)}.lazy-summary-row b{font:600 12px/1.35 var(--ui);color:var(--text)}
+  .lazy-ready{padding:12px 13px;border:1px solid rgba(29,158,117,.28);background:rgba(29,158,117,.07);border-radius:12px;color:#b8efd9;font:12px/1.45 var(--ui);margin-bottom:12px}
+  @media(max-width:560px){.lazy-options{grid-template-columns:1fr}.lazy-card{padding:20px}.lazy-summary-row{grid-template-columns:1fr;gap:3px}}
+
+</style>
+</head>
+<body>
+<!--
+  MEASUREMENT — Vercel Web Analytics (no other tracking, by design)
+  1) In the Vercel dashboard: Project -> Analytics -> Enable. For most plain-HTML
+     deployments the platform then serves analytics automatically.
+  2) If pageviews don't appear for this static deployment, add the documented
+     static-site snippet just before the closing body tag:
+       <script defer src="/_vercel/insights/script.js"></script>
+  Imagend itself runs entirely in the browser; nothing the user types is sent anywhere.
+-->
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark"></div>
+      <div>
+        <h1>Imagend</h1>
+        <div class="tag">Imagination, rendered — one idea into every model's language.</div>
+      </div>
+    </div>
+    <div class="credit">prompt engine · <b>v2</b></div>
+    <div class="user-pill" id="userPill" style="display:none"></div>
+  </header>
+
+  <section class="hero" data-collapsible data-collapse-key="hero" data-default-collapsed="1">
+    <button class="sec-head hero-head" type="button" aria-expanded="false">
+      <span class="sec-titles">
+        <h2>One idea. <em>Five model dialects.</em> Zero guesswork.</h2>
+        <span class="hero-tagline"><b>Imagend writes the prompt — you get the image.</b> <span class="readmore">Read more</span></span>
+      </span>
+      <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+    </button>
+    <div class="sec-body">
+      <p class="hero-lead">Tell it your concept and it rewrites that idea into the exact language Midjourney, Nano Banana / GPT-Image, Ideogram, Flux and Recraft each need. Copy the prompt, paste it into your model, and the picture follows.</p>
+      <p class="hero-jobs">Built for the work you actually ship — <b>posters · brand visuals · promos · UGC · logos</b>. No design degree, no prompt-craft required.</p>
+      <div class="hero-chips">
+        <span class="chip-emph">Never ship a below-grade render again</span>
+        <span>5 model dialects</span>
+        <span>28 design styles</span>
+        <span id="countChip" hidden></span>
+        <span>100% in your browser — nothing uploaded</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <!-- STUDIO -->
+    <section class="panel studio">
+      <div class="fast-start" aria-label="Quick start">
+        <button class="fast-primary" id="topSurpriseBtn">🎲 Surprise me</button>
+        <button class="fast-ghost" id="lazyGuideBtn">✦ Lazy Guide</button>
+        <button class="fast-ghost" id="howToBtn">? How to use</button>
+        <span class="fast-spacer"></span>
+        <span class="fast-note">Fastest path: Surprise → preview → copy</span>
+        <button class="fast-ghost" id="clearRackBtn">↺ Clear rack</button>
+      </div>
+      <div class="csec" data-collapsible data-collapse-key="idea" data-done-key="idea">
+        <div class="sec-head-row">
+          <button class="sec-head" type="button" aria-expanded="false">
+            <span class="sec-titles"><span class="insp-title">Your idea</span></span>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+          </button>
+          <label class="done-toggle" title="Mark this section done"><input type="checkbox" class="done-cb"><span class="dot"></span>Done</label>
+        </div>
+        <div class="sec-body">
+          <div class="idea-field">
+            <div class="idea-head"><span class="idea-pin-lab">Pin to keep on every roll</span><button class="lock" data-lock="idea" title="Pin this field"></button></div>
+            <div class="idea-cta">Type your idea below — watch it become five expert prompts, instantly.</div>
+            <textarea id="idea" placeholder="e.g. a sneaker brand hero shot of a glowing white trainer floating over wet concrete at night"></textarea>
+          </div>
+
+          <div class="ref-block">
+            <div class="ref-head">
+              <span class="insp-title">Reference image</span>
+              <label class="switch"><input type="checkbox" id="refToggle"><span class="track"></span></label>
+            </div>
+            <div id="refBody" class="ref-body" style="display:none">
+              <div class="ref-drop" id="refDrop">
+                <input type="file" id="refFile" accept="image/*" hidden>
+                <img id="refThumb" alt="">
+                <div class="ref-placeholder" id="refPlaceholder">Drop or tap to add your image<span>optional — for your preview; you'll attach the real file in your model</span></div>
+                <button class="ref-clear" id="refClear" title="Remove" style="display:none">✕</button>
+              </div>
+              <div class="knobs" style="margin-top:13px">
+                <div class="knob"><label>Borrow from it</label>
+                  <select id="refBorrow">
+                    <option value="style">style &amp; aesthetic</option><option value="composition">composition &amp; layout</option><option value="subject">main subject</option><option value="color">colour palette</option>
+                  </select></div>
+                <div class="knob"><label>Strength</label>
+                  <div class="seg" id="refStrength">
+                    <button data-v="subtle">Subtle</button>
+                    <button data-v="bal" class="on">Balanced</button>
+                    <button data-v="strong">Strong</button>
+                  </div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="csec" data-collapsible data-collapse-key="category" data-done-key="category">
+        <div class="sec-head-row">
+          <button class="sec-head" type="button" aria-expanded="false">
+            <span class="sec-titles"><span class="insp-title">Category</span></span>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+          </button>
+          <label class="done-toggle" title="Mark this section done"><input type="checkbox" class="done-cb"><span class="dot"></span>Done</label>
+        </div>
+        <div class="sec-body">
+          <div class="cats" id="cats"></div>
+          <div id="catKnobs"></div>
+        </div>
+      </div>
+
+      <div class="csec" data-collapsible data-collapse-key="starts" data-done-key="starts">
+        <div class="sec-head-row">
+          <button class="sec-head" type="button" aria-expanded="false">
+            <span class="sec-titles"><span class="insp-title">✦ Top-grade starts</span></span>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+          </button>
+          <label class="done-toggle" title="Mark this section done"><input type="checkbox" class="done-cb"><span class="dot"></span>Done</label>
+        </div>
+        <div class="sec-body"><div id="inspire"></div></div>
+      </div>
+
+      <div class="csec" data-collapsible data-collapse-key="style" data-done-key="style">
+        <div class="sec-head-row">
+          <button class="sec-head" type="button" aria-expanded="false">
+            <span class="sec-titles"><span class="insp-title">Style</span></span>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+          </button>
+          <label class="done-toggle" title="Mark this section done"><input type="checkbox" class="done-cb"><span class="dot"></span>Done</label>
+        </div>
+        <div class="sec-body">
+        <div class="style-wrap">
+          <div class="knobs">
+          <div class="knob full"><div class="klab"><span>Design style</span><button class="lock" data-lock="s:aesthetic" title="Pin this field"></button></div>
+            <select id="s_aesthetic">
+              <option value="">Auto</option><option>editorial</option><option>minimalist</option><option>brutalist</option><option>art deco</option><option>bauhaus</option><option>swiss design</option><option>memphis</option><option>vaporwave</option><option>cyberpunk</option><option>y2k</option><option>cottagecore</option><option>scandinavian</option><option>japandi</option><option>retro-futurism</option><option>glassmorphism</option><option>claymorphism</option><option>neubrutalism</option><option>surrealist</option><option>vintage film</option><option>ukiyo-e</option><option>pop art</option><option>streetwear</option><option>luxury editorial</option><option>dark academia</option><option>solarpunk</option><option>psychedelic</option><option>mid-century modern</option><option>sci-fi concept art</option>
+            </select></div>
+          <div class="knob"><div class="klab"><span>Mood</span><button class="lock" data-lock="s:mood" title="Pin this field"></button></div>
+            <select id="s_mood">
+              <option value="">Auto</option><option>serene</option><option>energetic</option><option>moody</option><option>luxurious</option><option>playful</option><option>dramatic</option><option>nostalgic</option><option>futuristic</option><option>minimalist</option><option>elegant</option><option>whimsical</option><option>gritty</option><option>dreamy</option><option>bold &amp; confident</option><option>romantic</option><option>mysterious</option>
+            </select></div>
+          <div class="knob"><div class="klab"><span>Palette</span><button class="lock" data-lock="s:palette" title="Pin this field"></button></div>
+            <select id="s_palette">
+              <option value="">Auto</option><option>monochrome</option><option>warm tones</option><option>cool tones</option><option>pastel</option><option>vibrant</option><option>earthy</option><option>neon</option><option>muted</option><option>duotone</option><option>jewel tones</option><option>sunset gradient</option><option>high-contrast black and white</option><option>autumnal</option><option>oceanic blues</option><option>candy pop</option><option value="__hex">custom hex…</option>
+            </select></div>
+          <div class="knob full" id="hexWrap" style="display:none"><label>Brand color (hex)</label>
+            <input type="text" id="s_hex" placeholder="#0A84FF" maxlength="7"></div>
+          <div class="knob"><div class="klab"><span>Lighting</span><button class="lock" data-lock="s:light" title="Pin this field"></button></div>
+            <select id="s_light">
+              <option value="">Auto</option><option>soft natural light</option><option>golden hour</option><option>studio softbox lighting</option><option>dramatic chiaroscuro</option><option>neon glow</option><option>overcast diffused light</option><option>backlit rim light</option><option>cinematic lighting</option><option>high-key bright light</option><option>low-key shadow</option><option>split lighting</option><option>blue hour</option><option>candlelight glow</option><option>harsh direct flash</option><option>volumetric god rays</option>
+            </select></div>
+          <div class="knob"><div class="klab"><span>Medium / render</span><button class="lock" data-lock="s:medium" title="Pin this field"></button></div>
+            <select id="s_medium">
+              <option value="">Auto</option><option>photography</option><option>3D render</option><option>illustration</option><option>flat vector</option><option>oil painting</option><option>watercolor</option><option>risograph print</option><option>cinematic film still</option><option>product photography</option><option>isometric 3D</option><option>matte painting</option><option>anime style</option><option>double exposure</option><option>charcoal sketch</option><option>paper collage</option><option>claymation</option><option>line art</option>
+            </select></div>
+          <div class="knob"><div class="klab"><span>Aspect ratio</span><button class="lock" data-lock="s:ar" title="Pin this field"></button></div>
+            <select id="s_ar">
+              <option value="">Auto (per category)</option><option>1:1</option><option>4:5</option><option>2:3</option><option>3:2</option><option>16:9</option><option>9:16</option>
+            </select></div>
+          <div class="knob"><div class="klab"><span>Detail intensity</span><button class="lock" data-lock="detail" title="Pin this field"></button></div>
+            <div class="seg" id="s_detail">
+              <button data-v="min">Minimal</button>
+              <button data-v="bal" class="on">Balanced</button>
+              <button data-v="rich">Rich</button>
+            </div></div>
+        </div>
+      </div>
+        </div>
+      </div>
+
+      <div class="csec" data-collapsible data-collapse-key="brand" data-done-key="brand">
+        <div class="sec-head-row">
+          <button class="sec-head" type="button" aria-expanded="false">
+            <span class="sec-titles"><span class="insp-title">Brand settings</span></span>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+          </button>
+          <label class="done-toggle" title="Mark this section done"><input type="checkbox" class="done-cb"><span class="dot"></span>Done</label>
+        </div>
+        <div class="sec-body">
+          <div class="brand-kit">
+            <div class="ref-head">
+              <span class="insp-title">Brand kit</span>
+              <label class="switch"><input type="checkbox" id="bkToggle"><span class="track"></span></label>
+            </div>
+            <div id="bkBody" class="ref-body" style="display:none">
+              <div class="knobs">
+                <div class="knob"><label>Brand name</label><input type="text" id="bk_name" placeholder="e.g. Kobo"></div>
+                <div class="knob"><label>Brand hex</label><input type="text" id="bk_hex" placeholder="#0A84FF" maxlength="7"></div>
+                <div class="knob"><label>Default design style</label><select id="bk_aesthetic"></select></div>
+                <div class="knob"><label>Default palette</label><select id="bk_palette"></select></div>
+                <div class="knob"><label>Default aspect ratio</label><select id="bk_ar"></select></div>
+              </div>
+              <p class="bk-note">Kit on = every new roll and render inherits these defaults. Pinned fields still win. Your idea text is never touched.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- OUTPUT -->
+    <section class="panel output">
+      <div class="csec" data-collapsible data-collapse-key="prompt" data-done-key="prompt" data-done-mode="action">
+        <div class="sec-head-row">
+          <button class="sec-head" type="button" aria-expanded="false">
+            <span class="sec-titles"><span class="insp-title">Optimized prompt</span></span>
+            <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+          </button>
+          <span class="last-action" id="lastAction" hidden></span>
+        </div>
+        <div class="sec-body">
+          <div class="models" id="models">
+            <button data-m="mj">Midjourney<span class="sub">v7 · params</span><span class="rec">best</span></button>
+            <button data-m="nb">Nano Banana<span class="sub">/ GPT-Image</span><span class="rec">best</span></button>
+            <button data-m="id">Ideogram<span class="sub">text · logos</span><span class="rec">best</span></button>
+            <button data-m="fl">Flux<span class="sub">1.1 · dense</span><span class="rec">best</span></button>
+            <button data-m="rc">Recraft<span class="sub">brand · vector</span><span class="rec">best</span></button>
+          </div>
+          <div class="hint" id="dialectHint" hidden>Same idea, five dialects — <b>click through</b><button id="hintClose" aria-label="Dismiss hint">✕</button></div>
+          <div class="out-body">
+            <div class="gen-gate" id="genGate" style="display:none">
+              <div class="pro-gate-ic">✦</div>
+              <div class="pro-gate-title">You've used your 5 free prompts</div>
+              <div class="pro-gate-sub">Upgrade to Pro for unlimited image and video prompts across all 5 models.</div>
+              <button class="pro-gate-btn" id="genUpgradeBtn">See plans</button>
+              <div class="gate-code-row"><input class="gate-code-input" id="genCodeInput" type="text" placeholder="Have a beta code?"><button class="gate-code-btn" id="genCodeBtn">Redeem</button></div>
+            </div>
+            <div class="prompt-box" id="promptBox">
+              <div class="blab">Prompt preview</div>
+              <div class="prompt-modebar">
+                <button class="prompt-tab on" id="promptTabBtn" type="button">Prompt</button>
+                <button class="prompt-tab" id="breakdownTabBtn" type="button">Design breakdown</button>
+                <span class="prompt-status" id="promptStatus">Generated</span>
+              </div>
+              <button class="copy savebtn" id="saveBtn" title="Save to library">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+              </button>
+              <button class="copy" id="copyBtn" title="Copy">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+              <div id="promptText"></div>
+              <textarea id="promptEdit" aria-label="Edit prompt before copying"></textarea>
+              <div class="breakdown-grid" id="breakdownGrid"></div>
+              <div class="prompt-edit-actions" id="promptEditActions">
+                <button id="editPromptBtn" type="button">✎ Edit manually</button>
+                <button id="resetPromptBtn" type="button" style="display:none">Reset to generated</button>
+              </div>
+            </div>
+            <div class="chips" id="chips"></div>
+            <div class="neg-box" id="negBox">
+              <div class="neg-head">
+                <span class="blab">Negative / avoid</span>
+                <label class="neg-switch"><span class="neg-cap" id="negCap">In prompt</span><span class="switch sm"><input type="checkbox" id="negToggle" checked><span class="track"></span></span></label>
+              </div>
+              <div class="ntext" id="negText"></div>
+            </div>
+            <div class="fix-box" id="fixBox" style="display:none">
+              <div class="blab">⚖ Smart fixes</div>
+              <div class="ftext" id="fixText"></div>
+            </div>
+            <div class="why" id="why"></div>
+            <div class="out-actions">
+              <button class="act-ghost" id="copyAllBtn">⧉ Copy all 5 models</button>
+              <button class="act-share" id="shareBtn">Share setup</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="csec" data-collapsible data-collapse-key="nextstep" data-done-key="nextstep">
+    <div class="sec-head-row">
+      <button class="sec-head" type="button" aria-expanded="false">
+        <span class="sec-titles"><span class="insp-title">→ Next step</span></span>
+        <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+      </button>
+      <label class="done-toggle" title="Mark done"><input type="checkbox"><span class="dot"></span>Done</label>
+    </div>
+    <div class="sec-body">
+      <div class="next-step">
+        <span class="ns-badge">Next</span>
+        <div class="ns-body">Copy a prompt above → paste into <b>that model</b> (Midjourney, GPT-Image, Ideogram, Flux or Recraft) → generate. Using a reference? Attach the real file there.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="history csec no-glow" id="historyRail" data-collapsible data-collapse-key="history" data-default-collapsed="1">
+    <div class="sec-head-row">
+      <button class="sec-head" type="button" aria-expanded="false">
+        <span class="sec-titles"><span class="insp-title">↺ Recent rolls</span></span>
+        <span class="count-badge" id="histCount" hidden></span>
+        <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+      </button>
+    </div>
+    <div class="sec-body"><div class="hist-row" id="histRow"></div></div>
+  </section>
+
+  <section class="history csec no-glow" id="libraryRail" data-collapsible data-collapse-key="library" data-default-collapsed="1">
+    <div class="sec-head-row">
+      <button class="sec-head" type="button" aria-expanded="false">
+        <span class="sec-titles"><span class="insp-title">★ Library</span></span>
+        <span class="count-badge" id="libCount" hidden></span>
+        <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+      </button>
+    </div>
+    <div class="sec-body"><div class="hist-row" id="libRow"></div></div>
+  </section>
+
+  <section class="proof" id="proofSection" hidden>
+    <div class="proof-head">
+      <span class="insp-title">★ What people are making with Imagend</span>
+      <span class="proof-count" id="proofCount"></span>
+    </div>
+    <div class="reviews" id="reviewRow"></div>
+  </section>
+
+  <section class="globe-sec" id="globeSection" data-collapsible data-collapse-key="globe">
+    <button class="sec-head" type="button" aria-expanded="true">
+      <span class="sec-titles">
+        <span class="insp-title">🌍 Made around the world</span>
+        <span class="globe-sub-lite">Real jobs shipped with Imagend prompts — tap a pin.</span>
+      </span>
+      <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+    </button>
+    <div class="sec-body">
+      <div class="globe-submit-row"><a href="https://www.instagram.com/imagend.app" target="_blank" rel="noopener" id="globeSubmit">Send yours on Instagram →</a></div>
+      <div class="globe-stage">
+        <canvas id="globe" width="640" height="640" aria-label="Rotating globe with pins marking jobs created around the world"></canvas>
+        <div class="pin-layer" id="pinLayer"></div>
+        <div class="job-card" id="jobCard" hidden>
+          <button class="job-close" id="jobClose" aria-label="Close">✕</button>
+          <div class="job-img" id="jobImg"></div>
+          <div class="job-meta">
+            <div class="job-loc" id="jobLoc"></div>
+            <div class="job-cap" id="jobCap"></div>
+            <div class="job-by" id="jobBy"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>Imagend — your idea, focused into every model's language. Runs entirely in your browser.</footer>
+</div>
+
+<!-- ===== PORTAL SWITCH (door between the two worlds) ===== -->
+<button class="portal-tab" id="portalTab" type="button" aria-label="Switch to the video prompt optimizer">
+  <span class="portal-tab-icon">🎬</span>
+  <span class="portal-tab-label">Video<br>world</span>
+  <span class="portal-tab-arrow">→</span>
+</button>
+<div class="portal-veil" id="portalVeil" aria-hidden="true"><div class="portal-iris"></div><div class="portal-word">Imagend</div></div>
+
+<div class="lazy-backdrop" id="lazyGuideModal" role="dialog" aria-modal="true" aria-labelledby="lazyGuideTitle">
+  <div class="lazy-card">
+    <div class="lazy-top">
+      <div><div class="lazy-eyebrow">Lazy Guide</div><div class="lazy-title" id="lazyGuideTitle">No design words needed.</div></div>
+      <button class="lazy-close" id="lazyGuideClose" aria-label="Close">×</button>
+    </div>
+    <div class="lazy-progress"><span id="lazyProgress"></span></div>
+    <div id="lazyGuideBody"></div>
+  </div>
+</div>
+<div class="howto-backdrop" id="howToModal" role="dialog" aria-modal="true" aria-labelledby="howToTitle">
+  <div class="howto-card">
+    <div class="howto-top"><div class="howto-title" id="howToTitle">Get the aha in 20 seconds</div><button class="howto-close" id="howToClose" aria-label="Close">×</button></div>
+    <div class="howto-sub">Imagend does the prompt engineering for you. Start with Surprise, use Lazy Guide, or type your own idea.</div>
+    <div class="howto-steps">
+      <div class="howto-step"><div class="howto-num">1</div><div><b>Pick the easiest start</b><p><strong>Surprise me</strong> decides everything. <strong>Lazy Guide</strong> asks up to five simple questions. Or type your own rough idea.</p></div></div>
+      <div class="howto-step"><div class="howto-num">2</div><div><b>Preview what the model will receive</b><p>Switch between Midjourney, GPT-Image, Ideogram, Flux and Recraft. Imagend rewrites the same idea for each one.</p></div></div>
+      <div class="howto-step"><div class="howto-num">3</div><div><b>Edit or copy</b><p>Fine-tune anything you care about, edit the final prompt manually if you want, then copy it into your image model.</p></div></div>
+    </div>
+    <div class="howto-aha"><button class="fast-primary" id="howToTryBtn">🎲 Show me a finished example</button><button class="fast-ghost" id="howToOwnBtn">I’ll use my own idea</button></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+
+<script>
+/* ============================================================
+   IMAGEND ENGINE
+   idea + category + style  ->  semantic IR  ->  per-model serializer
+   ============================================================ */
+
+const state = {
+  idea:"",
+  category:"brand",
+  model:"nb",
+  detail:"bal",
+  cat:{},                 // category-specific knob values
+  style:{mood:"",palette:"",hex:"",light:"",medium:"",ar:"",aesthetic:""},
+  reference:{on:false, borrow:"style", strength:"bal"},
+  negOn:true,             // include the negative/avoid list in the copied prompt
+  locks:new Set(),        // pinned fields, survive a re-roll
+  history:[],             // recent rolls (newest first)
+  activeHist:null
+};
+
+/* ============================================================
+   STORAGE — single safe wrapper. localStorage is blocked in some
+   preview sandboxes, so every read/write goes through `store`,
+   which silently falls back to an in-memory object.
+   NEVER call localStorage directly anywhere else.
+   ============================================================ */
+const store = (()=>{
+  const mem = {};
+  let ok = false;
+  try{ window.localStorage.setItem("__imagend_t","1"); window.localStorage.removeItem("__imagend_t"); ok = true; }catch(e){ ok = false; }
+  return {
+    get(k){ if(ok){ try{ return window.localStorage.getItem(k); }catch(e){ ok=false; } } return (k in mem)? mem[k] : null; },
+    set(k,v){ if(ok){ try{ window.localStorage.setItem(k,v); return; }catch(e){ ok=false; } } mem[k]=v; },
+    remove(k){ if(ok){ try{ window.localStorage.removeItem(k); return; }catch(e){ ok=false; } } delete mem[k]; }
+  };
+})();
+
+const K_STATE="imagend:state", K_LIB="imagend:library", K_BRAND="imagend:brand";
+
+/* brand kit + library + session bookkeeping */
+let BRAND = {on:false, name:"", hex:"", aesthetic:"", palette:"", ar:""};
+let LIBRARY = [];
+let sessions = 0;
+let hintDismissed = false;
+let bootDone = false;
+let generatedPrompt = "";
+let manualPrompt = "";
+let promptEditing = false;
+let promptTab = "prompt";
+let lazyGuide = {step:0, answers:{category:"",idea:"",hero:"",feel:"",surface:"",text:""}};
+
+/* ============================================================
+   SOCIAL PROOF DATA — honest by construction.
+   REVIEWS and JOBS start as clearly-labelled SAMPLES so you can
+   see the layout. Replace each `sample:true` entry with a real
+   one (and set sample:false, or delete it) the moment you have
+   it — from your fan-page submissions or real user reviews.
+   Nothing here is presented as a real metric until it is one.
+   USER_COUNT_OVERRIDE: leave null to show the honest live/local
+   session tally; set a number ONLY when you have a verified count
+   from Vercel Analytics.
+   ============================================================ */
+const USER_COUNT_OVERRIDE = null;
+
+const REVIEWS = [
+  // {quote:"...", by:"Name, role, city", stars:5, sample:false}   <-- real ones look like this
+  {quote:"Sample review — replace me with a real one from your fan page or reviews.", by:"Your first reviewer", stars:5, sample:true},
+  {quote:"Sample review — the layout, stars and attribution are ready for real words.", by:"A real designer, soon", stars:5, sample:true},
+  {quote:"Sample review — until these are real, the section stays hidden from visitors.", by:"A real marketer, soon", stars:5, sample:true}
+];
+
+/* ============================================================
+   ★ THE GLOBE WALL — HOW TO ADD A PIN  (you edit this by hand)
+   ------------------------------------------------------------
+   People send their renders to your Instagram (@imagend.app).
+   When you get a good one, add it here. That's the whole workflow:
+   get a public image URL  ->  add one line below  ->  redeploy.
+
+   EACH PIN IS ONE LINE. Copy this template and fill it in:
+
+     {lat:6.45, lng:3.40, loc:"Lagos, NG", cap:"Sneaker drop poster",
+      by:"@theirhandle", img:"/wall/lagos-poster.webp", sample:false},
+
+   THE FIELDS:
+     • lat / lng — where the pin sits. Google "<city> lat long" and
+       paste the two numbers. (Negative = south / west.)
+     • loc — the label shown on the card, e.g. "Lagos, NG".
+     • cap — short caption: what it is.
+     • by  — their handle/credit, e.g. "@uzo". Leave "" if none.
+     • img — a PUBLIC image URL. Two easy ways to get one:
+         1) Drop the file in your project's /public/wall/ folder and
+            use "/wall/filename.webp".
+         2) Or upload to a free host (Cloudinary, imgbb) and paste
+            the link they give you.
+       Resize to ~1200px longest edge and save as WebP/JPG first so
+       the globe stays fast.
+     • sample — set to false for real pins. The sample:true pins below
+       are just placeholders; DELETE them as your real ones come in.
+       Once a real pin exists, remove all the samples.
+
+   No image yet? Leave img:"" and the pin shows as a coloured dot —
+   fine as a placeholder, but real images are what sell the wall.
+   ============================================================ */
+const JOBS = [
+  // ↓↓↓ DELETE these 8 samples as real submissions replace them ↓↓↓
+  {lat:6.45,lng:3.40,loc:"Lagos, NG",   cap:"Sample pin — send yours to @imagend.app on Instagram.", by:"Send yours", img:"", sample:true},
+  {lat:40.71,lng:-74.0,loc:"New York, US",cap:"Sample pin — real jobs replace these.",       by:"Send yours", img:"", sample:true},
+  {lat:51.51,lng:-0.13,loc:"London, UK", cap:"Sample pin — high-fidelity image goes here.",  by:"Send yours", img:"", sample:true},
+  {lat:35.68,lng:139.7,loc:"Tokyo, JP",  cap:"Sample pin — caption + creator credit.",       by:"Send yours", img:"", sample:true},
+  {lat:-23.5,lng:-46.6,loc:"São Paulo, BR",cap:"Sample pin — anyone can submit theirs.",     by:"Send yours", img:"", sample:true},
+  {lat:-33.9,lng:18.42,loc:"Cape Town, ZA",cap:"Sample pin — globe keeps turning.",          by:"Send yours", img:"", sample:true},
+  {lat:28.61,lng:77.20,loc:"New Delhi, IN",cap:"Sample pin — tap opens the full card.",       by:"Send yours", img:"", sample:true},
+  {lat:48.85,lng:2.35, loc:"Paris, FR",  cap:"Sample pin — X closes back to the pins.",      by:"Send yours", img:"", sample:true}
+  // ↑↑↑ add your real pins here (sample:false), then remove the samples above ↑↑↑
+];
+
+
+
+const LOCK_OPEN  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.4-1.8"/></svg>';
+const LOCK_CLOSED= '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+
+/* ---- detail tuning ---- */
+const STYLIZE = {min:55, bal:280, rich:680};
+const RICH_TOKENS = ["highly detailed","intricate texture","crisp focus","8k"];
+const MIN_NOTE = "clean and uncluttered";
+
+/* ---- category definitions ---- */
+const CATEGORIES = {
+  poster:{
+    label:"Poster", icon:"🖼", rec:"id", ar:"2:3",
+    medium:"poster design",
+    knobs:[
+      {id:"ptype",label:"Poster type",type:"select",opts:["event","movie","typographic","minimalist","product feature","concert"]},
+      {id:"headline",label:"Headline text",type:"text",ph:"e.g. NIGHT MARKET"},
+      {id:"sub",label:"Subheadline (optional)",type:"text",ph:"e.g. Lagos · Dec 21"},
+      {id:"layout",label:"Layout",type:"select",opts:["centered hero","rule-of-thirds","full-bleed image with text band","bold typographic grid","minimal negative space"]}
+    ],
+    base:["bold typographic hierarchy","strong focal composition","print-ready, high contrast"],
+    neg:["clutter","low resolution","watermark","distorted text","misspelled words","blurry"]
+  },
+  brand:{
+    label:"Brand", icon:"◆", rec:"nb", ar:"16:9",
+    medium:"commercial brand visual",
+    knobs:[
+      {id:"surface",label:"Surface",type:"select",opts:["website hero banner","social square","story / vertical","billboard","email header"]},
+      {id:"focus",label:"Subject focus",type:"select",opts:["product","lifestyle scene","abstract concept","pattern / texture"]},
+      {id:"vibe",label:"Brand vibe",type:"select",opts:["premium minimal","bold & energetic","warm & human","tech / futuristic","organic / natural"]}
+    ],
+    base:["cohesive brand aesthetic","clean composition with negative space for overlay copy","commercial-grade quality"],
+    neg:["clutter","busy background","stock-photo cliché","watermark","logo artifacts"]
+  },
+  ugc:{
+    label:"UGC", icon:"📱", rec:"nb", ar:"9:16",
+    medium:"authentic user-generated photo",
+    knobs:[
+      {id:"device",label:"Shot on",type:"select",opts:["iPhone front camera","iPhone main camera","Android phone","old webcam"]},
+      {id:"setting",label:"Setting",type:"select",opts:["bedroom","kitchen","café","car","outdoors / street","bathroom mirror"]},
+      {id:"framing",label:"Framing",type:"select",opts:["selfie","handheld product","over-the-shoulder","point-of-view"]},
+      {id:"auth",label:"Authenticity",type:"select",opts:["subtle","strong"]}
+    ],
+    base:["candid, unposed","natural skin texture","slightly imperfect framing","real-life amateur photography","natural available light"],
+    neg:["studio lighting","professional model","airbrushed skin","stock photo look","oversaturated","CGI","3D render","perfect symmetry","glossy retouch"]
+  },
+  logo:{
+    label:"Logo", icon:"✳", rec:"id", ar:"1:1",
+    medium:"flat vector logo design",
+    knobs:[
+      {id:"ltype",label:"Logo type",type:"select",opts:["wordmark","lettermark / monogram","pictorial mark","abstract mark","combination mark","emblem / badge"]},
+      {id:"name",label:"Brand name / letters",type:"text",ph:"e.g. KOBO"},
+      {id:"lstyle",label:"Style",type:"select",opts:["flat geometric","monoline","bold sans","elegant serif","hand-drawn","gradient modern"]},
+      {id:"concept",label:"Concept / industry",type:"text",ph:"e.g. fintech, a coin + leaf"}
+    ],
+    base:["scalable vector","clean crisp lines","centered on solid background","balanced and memorable","works in single colour"],
+    neg:["photorealistic","gradient mesh","drop shadow","3D bevel","mockup","busy detail","text errors","tagline clutter"]
+  },
+  promo:{
+    label:"Promo", icon:"🔥", rec:"id", ar:"4:5",
+    medium:"advertising promo creative",
+    knobs:[
+      {id:"ptype",label:"Promo type",type:"select",opts:["product launch","sale / discount","feature highlight","testimonial","app screenshot ad"]},
+      {id:"headline",label:"Headline text",type:"text",ph:"e.g. 50% OFF TODAY"},
+      {id:"energy",label:"Energy",type:"select",opts:["premium calm","urgent / punchy","playful","trustworthy"]},
+      {id:"product",label:"Product in shot",type:"text",ph:"e.g. a skincare bottle"}
+    ],
+    base:["polished advertising aesthetic","clear visual hierarchy","focal product with space for headline & CTA","conversion-focused"],
+    neg:["clutter","low contrast","distorted text","amateur framing","watermark","misspelled words"]
+  }
+};
+
+const MODEL_NAME = {mj:"Midjourney", nb:"Nano Banana / GPT-Image", id:"Ideogram", fl:"Flux", rc:"Recraft"};
+
+/* ============================================================
+   INSPIRE — curated seeds + guarded randomizer
+   Each category has 5 top-grade concepts. The roller fills the
+   remaining knobs from category-legal pools, so any random pull
+   stays coherent and produces a strong prompt.
+   ============================================================ */
+const pick = a => a[Math.floor(Math.random()*a.length)];
+
+const SEEDS = {
+  poster:[
+    {name:"Swiss Grid", idea:"an editorial typographic poster on a strict modular grid, one oversized condensed headline breaking across the page over a single duotone photograph", pref:{ptype:"typographic", layout:"bold typographic grid", medium:"", palette:"monochrome"}},
+    {name:"Neon Night Market", idea:"a vibrant night-market event poster, layered neon signage and rising steam, a dense energetic collage of food stalls and crowd", pref:{ptype:"event", layout:"full-bleed image with text band", palette:"neon", light:"neon glow"}},
+    {name:"Quiet Product", idea:"a minimalist product poster, a single hero object centred in vast negative space above a soft gradient", pref:{ptype:"minimalist", layout:"minimal negative space", palette:"muted"}},
+    {name:"Riso Gig", idea:"a retro risograph gig poster, limited two-colour overprint with halftone texture and bold geometric shapes", pref:{ptype:"concert", medium:"risograph print", layout:"centered hero"}},
+    {name:"Cinematic Teaser", idea:"a cinematic teaser poster, a lone silhouetted figure against a vast dramatic sky with atmospheric haze and a title lockup at the base", pref:{ptype:"movie", layout:"rule-of-thirds", medium:"cinematic film still", light:"cinematic lighting"}}
+  ],
+  brand:[
+    {name:"Luxury Pedestal", idea:"a luxury product hero resting on a sculpted pedestal, a controlled studio gradient with soft reflections and generous room for copy", pref:{focus:"product", vibe:"premium minimal", medium:"product photography", light:"studio softbox lighting"}},
+    {name:"Warm Lifestyle", idea:"a warm human lifestyle scene, a candid moment with the product in real use, golden window light, aspirational yet honest", pref:{focus:"lifestyle scene", vibe:"warm & human", light:"golden hour"}},
+    {name:"Liquid Tech", idea:"an abstract tech brand visual of flowing liquid-glass forms with depth and motion, sleek and futuristic", pref:{focus:"abstract concept", vibe:"tech / futuristic", medium:"3D render"}},
+    {name:"Tonal Pattern", idea:"a tonal brand pattern backdrop, a repeating geometric motif with tactile texture, built to sit behind overlaid copy", pref:{focus:"pattern / texture", vibe:"premium minimal", palette:"muted"}},
+    {name:"Bold Editorial", idea:"a bold editorial brand banner, an oversized cropped subject against a high-contrast colour block, magazine-grade composition", pref:{focus:"lifestyle scene", vibe:"bold & energetic", palette:"vibrant"}}
+  ],
+  ugc:[
+    {name:"Selfie Review", idea:"a casual selfie holding the product up toward the camera, slightly off-centre with a genuine smile and a messy bedroom behind", pref:{framing:"selfie", device:"iPhone front camera", setting:"bedroom", auth:"subtle"}},
+    {name:"Mirror OOTD", idea:"a bathroom mirror outfit selfie with the phone visible, harsh flash and real lived-in clutter", pref:{framing:"selfie", device:"iPhone main camera", setting:"bathroom mirror", auth:"strong"}},
+    {name:"Couch Unboxing", idea:"a point-of-view shot of hands opening a package on a couch with warm TV glow, candid and imperfect", pref:{framing:"point-of-view", device:"iPhone main camera", setting:"bedroom", auth:"subtle"}},
+    {name:"Café Table", idea:"a handheld shot of the product on a café table beside a latte, soft window light and a slightly tilted frame", pref:{framing:"handheld product", device:"iPhone main camera", setting:"café", auth:"subtle"}},
+    {name:"Car Vlog", idea:"a front-camera shot of someone talking in the car, seatbelt on, daylight through the windshield, everyday and real", pref:{framing:"point-of-view", device:"iPhone front camera", setting:"car", auth:"strong"}}
+  ],
+  logo:[
+    {name:"Geo Monogram", idea:"a single bold letter constructed from clean intersecting geometric shapes", pref:{ltype:"lettermark / monogram", lstyle:"flat geometric"}},
+    {name:"Modern Wordmark", idea:"a minimal modern wordmark in a custom sans-serif with one distinctive ligature detail", pref:{ltype:"wordmark", lstyle:"bold sans"}},
+    {name:"Motion Mark", idea:"an abstract pictorial mark, a simple memorable symbol suggesting motion and growth", pref:{ltype:"abstract mark", lstyle:"monoline"}},
+    {name:"Heritage Badge", idea:"a vintage emblem badge, a circular lockup with the name on the ring and an icon centred", pref:{ltype:"emblem / badge", lstyle:"elegant serif"}},
+    {name:"App Icon", idea:"a friendly rounded app-icon mark, an abstract symbol on a subtle gradient, scalable and modern", pref:{ltype:"pictorial mark", lstyle:"gradient modern", medium:""}}
+  ],
+  promo:[
+    {name:"Sale Punch", idea:"an urgent sale promo with a bold percentage headline, the product bursting forward in high-energy colour with clear space for a CTA", pref:{ptype:"sale / discount", energy:"urgent / punchy", palette:"vibrant"}},
+    {name:"Launch Spotlight", idea:"a premium product launch creative, a hero shot under a dramatic spotlight with an elegant headline and a sense of anticipation", pref:{ptype:"product launch", energy:"premium calm", light:"dramatic chiaroscuro", medium:"product photography"}},
+    {name:"Feature Callout", idea:"a feature-highlight ad, the product with one magnified callout detail, clean and trustworthy", pref:{ptype:"feature highlight", energy:"trustworthy", medium:"3D render"}},
+    {name:"App Store Hero", idea:"an app-store style promo, a device mockup floating with the UI visible against a gradient backdrop and a benefit-led headline", pref:{ptype:"app screenshot ad", energy:"playful", medium:"3D render"}},
+    {name:"Testimonial", idea:"a testimonial creative, a warm portrait paired with a short pull-quote in soft tones for social proof", pref:{ptype:"testimonial", energy:"trustworthy", light:"soft natural light"}}
+  ]
+};
+
+/* sample text used to prefill text knobs not fixed by a seed */
+const TEXTBANK = {
+  "poster.headline":["NIGHT MARKET","AFTERGLOW","VOLUME ONE","THE RETURN","OPEN LATE","NEON DREAMS","SUNDAY SESSIONS","CITY LIGHTS"],
+  "poster.sub":["Lagos · Dec 21","Two nights only","Doors 8PM","Free entry","Limited seats","One night only"],
+  "logo.name":["KOBO","ZENITH","NORA","FLUX","AURA","VANTA","MESA","ORBIT","LUMEN"],
+  "logo.concept":["fintech, a coin motif","wellness, a leaf","logistics, an arrow","coffee, a bean","AI, a spark","fashion, a knot","property, a roofline"],
+  "promo.headline":["50% OFF TODAY","NEW DROP","LIMITED RELEASE","BUY 1 GET 1","NOW SHIPPING","ENDS SUNDAY","JUST LANDED"],
+  "promo.product":["a skincare serum bottle","a pair of sneakers","a smartphone","a coffee bag","a wristwatch","a leather handbag","a pair of headphones"]
+};
+
+/* category-legal pools for the roller — guarantees coherence */
+const ROLL = {
+  poster:{mood:["","energetic","dramatic","playful","nostalgic","minimalist","bold & confident"],palette:["","vibrant","monochrome","warm tones","neon","duotone","muted","high-contrast black and white"],light:["","","dramatic chiaroscuro","cinematic lighting","neon glow"],medium:["","","illustration","risograph print","cinematic film still","matte painting"],ar:["2:3","2:3","1:1"],detail:["bal","rich","min"],aesthetic:["","editorial","swiss design","art deco","bauhaus","memphis","brutalist","pop art","streetwear","minimalist","vaporwave","sci-fi concept art"]},
+  brand:{mood:["","luxurious","serene","energetic","futuristic","elegant","minimalist"],palette:["","muted","warm tones","cool tones","monochrome","vibrant","jewel tones","oceanic blues"],light:["","studio softbox lighting","golden hour","soft natural light","cinematic lighting","backlit rim light","high-key bright light"],medium:["","photography","3D render","product photography","illustration","isometric 3D"],ar:["16:9","1:1","4:5","9:16"],detail:["bal","rich"],aesthetic:["","minimalist","luxury editorial","scandinavian","japandi","editorial","glassmorphism","mid-century modern","retro-futurism","bauhaus"]},
+  ugc:{mood:["","playful","nostalgic","serene"],palette:["","muted","warm tones","cool tones"],light:["","soft natural light","golden hour","overcast diffused light","backlit rim light","harsh direct flash"],medium:["","photography"],ar:["9:16","9:16","4:5","1:1"],detail:["min","bal"],aesthetic:["","","vintage film","y2k","streetwear","cottagecore","scandinavian"]},
+  logo:{mood:["","serene","playful","luxurious","futuristic","minimalist","elegant","bold & confident"],palette:["","monochrome","vibrant","cool tones","warm tones","muted","duotone","jewel tones"],light:[""],medium:["","","flat vector","illustration"],ar:["1:1"],detail:["bal","min"],aesthetic:["","minimalist","bauhaus","art deco","swiss design","memphis","mid-century modern","streetwear","retro-futurism","brutalist"]},
+  promo:{mood:["","energetic","luxurious","playful","dramatic","bold & confident"],palette:["","vibrant","warm tones","cool tones","neon","muted","candy pop"],light:["","studio softbox lighting","cinematic lighting","dramatic chiaroscuro","soft natural light","high-key bright light"],medium:["","product photography","3D render","photography","isometric 3D"],ar:["4:5","1:1","9:16"],detail:["bal","rich"],aesthetic:["","luxury editorial","pop art","memphis","streetwear","y2k","glassmorphism","editorial","cyberpunk","neubrutalism"]}
+};
+
+/* design-style vocabularies — these inject the descriptors that make output look art-directed */
+const AESTHETICS = {
+  "editorial":["editorial magazine layout","confident negative space","art-directed composition"],
+  "minimalist":["radical simplicity","generous negative space","single focal element","restrained palette"],
+  "brutalist":["raw concrete textures","heavy geometric forms","stark high contrast","unpolished honesty"],
+  "art deco":["geometric symmetry","gold linework","stylised sunburst motifs","1920s luxury elegance"],
+  "bauhaus":["primary colour blocks","clean geometric grid","functional balance","sans-serif rigor"],
+  "swiss design":["strict grid system","precise sans-serif type","asymmetric balance","objective clarity"],
+  "memphis":["playful 80s shapes","clashing bright colours","squiggles and confetti","postmodern energy"],
+  "vaporwave":["80s-90s nostalgia","pastel neon gradients","glitch and chrome","retro digital surrealism"],
+  "cyberpunk":["neon-drenched dystopia","rain-slicked reflections","holographic signage","high-tech low-life mood"],
+  "y2k":["early-2000s tech optimism","metallic bubble shapes","frosted translucent surfaces","chrome and gloss"],
+  "cottagecore":["soft pastoral warmth","handmade textures","wildflowers and linen","cosy nostalgic comfort"],
+  "scandinavian":["calm muted tones","natural wood and linen","airy uncluttered space","functional warmth"],
+  "japandi":["japanese-scandi fusion","wabi-sabi imperfection","muted earthy palette","serene minimal craft"],
+  "retro-futurism":["mid-century vision of the future","atomic-age curves","optimistic chrome and glow"],
+  "glassmorphism":["frosted translucent glass","soft blur and depth","vivid backdrop","layered light"],
+  "claymorphism":["soft rounded 3D clay forms","puffy tactile surfaces","pastel matte finish","friendly depth"],
+  "neubrutalism":["bold raw blocks","thick black outlines","clashing flat colours","intentional rough edges"],
+  "surrealist":["dreamlike impossible scene","unexpected juxtaposition","melting reality","subconscious imagery"],
+  "vintage film":["35mm film grain","faded analog colours","soft light leaks","nostalgic warmth"],
+  "ukiyo-e":["japanese woodblock print","flat bold outlines","stylised waves and clouds","muted traditional inks"],
+  "pop art":["bold ben-day dots","saturated primary colours","comic-style outlines","mass-culture irony"],
+  "streetwear":["bold urban graphics","oversized type","hype drop energy","gritty editorial cool"],
+  "luxury editorial":["high-fashion polish","refined minimal elegance","premium materials","magazine-grade lighting"],
+  "dark academia":["moody scholarly atmosphere","candlelit interiors","muted vintage tones","gothic romantic intellect"],
+  "solarpunk":["lush green optimism","sunlit organic architecture","nature-tech harmony","hopeful bright future"],
+  "psychedelic":["swirling kaleidoscopic colour","60s liquid patterns","trippy symmetry","hypnotic vibrance"],
+  "mid-century modern":["1950s-60s design","clean organic curves","warm muted palette","atomic geometric motifs"],
+  "sci-fi concept art":["cinematic concept art","epic scale and atmosphere","intricate futuristic detail","dramatic key light"]
+};
+
+/* ============================================================
+   COHERENCE ENGINE — the rules layer.
+   Runs on every IR before serialization. Category identity is
+   law, then media physics, then colour logic, then a negative
+   sweep so the final prompt can never argue with itself.
+   Fixes are surfaced in the UI — the brain shows its work.
+   ============================================================ */
+const PHOTO_MEDIA   = /photography|cinematic film still|3D render|matte painting|double exposure|claymation|isometric/i;
+const FLAT_MEDIA    = ["flat vector","line art","risograph print","paper collage"];
+const UGC_AES_OK    = ["","vintage film","y2k","streetwear","cottagecore","scandinavian"];
+const UGC_FAKE_LIGHT= ["studio softbox lighting","cinematic lighting","volumetric god rays","split lighting","high-key bright light"];
+const LOGO_AES_BLOCK= ["vintage film","sci-fi concept art","dark academia","surrealist","cyberpunk","luxury editorial","cottagecore","solarpunk"];
+const AES_COLOR = {           /* the colour-bearing descriptor inside each colour-loud bundle */
+  "memphis":"clashing bright colours",
+  "vaporwave":"pastel neon gradients",
+  "cyberpunk":"neon-drenched dystopia",
+  "pop art":"saturated primary colours",
+  "psychedelic":"swirling kaleidoscopic colour",
+  "bauhaus":"primary colour blocks",
+  "solarpunk":"lush green optimism",
+  "neubrutalism":"clashing flat colours"
+};
+const QUIET_PALETTES = ["monochrome","high-contrast black and white","duotone","muted"];
+const MOOD_CLASH = {          /* moods that contradict an aesthetic's whole personality */
+  "serene":["memphis","psychedelic","neubrutalism","pop art","cyberpunk","streetwear"],
+  "minimalist":["memphis","psychedelic","neubrutalism","pop art","vaporwave"],
+  "energetic":["japandi","scandinavian","cottagecore","dark academia"],
+  "luxurious":["neubrutalism","brutalist","memphis"],
+  "playful":["dark academia","brutalist"],
+  "gritty":["cottagecore","japandi","scandinavian","claymorphism"]
+};
+
+function applyCoherence(ir){
+  ir.fixes = [];
+  const s = state.style, cat = state.category;
+  const note = m => ir.fixes.push(m);
+  const dropDesc = arr => { ir.descriptors = ir.descriptors.filter(d=>arr.indexOf(d)===-1); };
+
+  /* 1 — UGC realism is non-negotiable: anything produced-looking breaks the format */
+  if(cat==="ugc"){
+    dropDesc(["art-directed composition","editorial finish"]);   /* our own polish tokens have no place here */
+    if(s.medium && s.medium!=="photography"){
+      ir.medium = CATEGORIES.ugc.medium;
+      note("Medium reset to phone photography — \u201C"+s.medium+"\u201D instantly reads as produced, which kills a UGC shot.");
+    }
+    if(UGC_FAKE_LIGHT.indexOf(ir.lighting)>-1){
+      ir.lighting = "natural available light";
+      note("\u201C"+s.light+"\u201D swapped for natural available light — pro lighting is the #1 tell of fake UGC.");
+    }
+    if(ir.aesthetic && UGC_AES_OK.indexOf(ir.aesthetic)===-1){
+      dropDesc(AESTHETICS[ir.aesthetic]||[]);
+      note("\u201C"+ir.aesthetic+"\u201D styling muted — it reads as art direction, and UGC has to look unstaged.");
+      ir.aesthetic = "";
+    }
+    if(ir.detail==="rich"){
+      dropDesc(RICH_TOKENS);
+      ir.mjStylize = STYLIZE.bal;
+      note("Rich detail dialled back — 8k gloss breaks the amateur-photo illusion.");
+    }
+    ir.mjRaw = true;   /* --style raw on Midjourney: photoreal honesty over MJ's house style */
+  }
+
+  /* 2 — logo discipline: a logo is flat, square, scalable artwork */
+  if(cat==="logo"){
+    if(s.light) note("Lighting removed — a logo is flat artwork; lighting language triggers 3D-bevel renders.");
+    if(s.medium && PHOTO_MEDIA.test(s.medium)){
+      ir.medium = CATEGORIES.logo.medium;
+      note("\u201C"+s.medium+"\u201D reset to flat vector — photographic media produce mockups, not marks.");
+    }
+    if(ir.ar!=="1:1"){
+      ir.ar = "1:1";
+      note("Aspect locked to 1:1 — a logo must be a square, scalable mark.");
+    }
+    if(ir.aesthetic && LOGO_AES_BLOCK.indexOf(ir.aesthetic)>-1){
+      dropDesc(AESTHETICS[ir.aesthetic]||[]);
+      note("\u201C"+ir.aesthetic+"\u201D muted — its photographic texture fights clean vector reproduction.");
+      ir.aesthetic = "";
+    }
+    if(ir.detail==="rich"){
+      dropDesc(RICH_TOKENS);
+      ir.descriptors.push("precise geometry","pixel-crisp edges");
+      note("8k texture tokens swapped for precise geometry — detail in a logo means cleaner lines, not more noise.");
+    }
+  }
+
+  /* 3 — flat print media have no physical light */
+  if(cat!=="logo" && ir.lighting && FLAT_MEDIA.indexOf((s.medium||"").toLowerCase())>-1){
+    note("\u201C"+ir.lighting+"\u201D muted — "+s.medium+" is flat print media; physical lighting doesn't exist there.");
+    ir.lighting = "";
+  }
+
+  /* 4 — a quiet palette beats a loud aesthetic's colour language */
+  if(ir.aesthetic && AES_COLOR[ir.aesthetic] && QUIET_PALETTES.indexOf(s.palette)>-1){
+    dropDesc([AES_COLOR[ir.aesthetic]]);
+    note("Kept the "+ir.aesthetic+" structure, dropped its colour language — your "+s.palette+" palette leads.");
+  }
+
+  /* 5 — monochrome cannot glow neon */
+  if((s.palette==="monochrome"||s.palette==="high-contrast black and white") && ir.lighting==="neon glow"){
+    ir.lighting = "stark high-contrast lighting";
+    note("Neon glow implies colour — swapped for stark high-contrast lighting to honour the mono palette.");
+  }
+
+  /* 6 — mood vs aesthetic identity: the style leads */
+  if(ir.mood && ir.aesthetic && (MOOD_CLASH[ir.mood]||[]).indexOf(ir.aesthetic)>-1){
+    note("\u201C"+ir.mood+"\u201D mood dropped — it argues with "+ir.aesthetic+"'s whole personality; the style leads.");
+    ir.mood = "";
+  }
+
+  /* 7 — a reference image owns what it borrows */
+  if(ir.reference && ir.reference.on){
+    if(ir.reference.borrow==="color" && ir.palette){
+      ir.palette = "";
+      note("Palette comes from your reference image — manual palette dropped so they don't fight.");
+    }
+    if(ir.reference.borrow==="style" && ir.reference.strength==="strong" && ir.aesthetic){
+      dropDesc(AESTHETICS[ir.aesthetic]||[]);
+      note("Strong style borrow set — the reference image defines the aesthetic, \u201C"+ir.aesthetic+"\u201D muted.");
+      ir.aesthetic = "";
+    }
+  }
+
+  /* 8 — negative sweep: drop any negative the positives now contradict.
+     Exact word-token matching: "uncluttered" must NOT count as "clutter". */
+  const hayWords = new Set([ir.medium, ir.lighting, ir.palette, ...ir.descriptors].join(" ").toLowerCase().split(/[^a-z0-9#]+/));
+  const hasWord = w => hayWords.has(w) || hayWords.has(w+"s") || (w.length>3 && w.charAt(w.length-1)==="s" && hayWords.has(w.slice(0,-1)));
+  ir.negatives = ir.negatives.filter(n=>{
+    const words = n.toLowerCase().split(/[^a-z0-9]+/).filter(w=>w.length>2);
+    const clash = words.length>0 && words.every(hasWord);
+    if(clash) note("\u201C"+n+"\u201D removed from negatives — it contradicted what you asked for.");
+    return !clash;
+  });
+  return ir;
+}
+
+function rollConfig(cat, seed){
+  const C = CATEGORIES[cat], r = ROLL[cat], p = seed.pref || {};
+  const cfg = {idea:(seed && seed.idea!=null)? seed.idea : (state.idea||""), cat:{}, style:{hex:""}, detail:(p.detail ?? pick(r.detail))};
+  C.knobs.forEach(kn=>{
+    if(p[kn.id]!=null){ cfg.cat[kn.id]=p[kn.id]; return; }
+    cfg.cat[kn.id] = kn.type==="select" ? pick(kn.opts) : pick(TEXTBANK[cat+"."+kn.id]||[""]);
+  });
+  cfg.style.mood    = p.mood    ?? pick(r.mood);
+  cfg.style.palette = p.palette ?? pick(r.palette);
+  cfg.style.light   = p.light   ?? pick(r.light);
+  cfg.style.medium  = p.medium  ?? pick(r.medium);
+  cfg.style.ar      = p.ar      ?? pick(r.ar);
+  cfg.style.aesthetic = p.aesthetic ?? pick(r.aesthetic);
+
+  /* locked fields keep their current value through the roll */
+  if(state.locks.has("idea")) cfg.idea = state.idea;
+  if(state.locks.has("detail")) cfg.detail = state.detail;
+  ["mood","palette","light","medium","ar","aesthetic"].forEach(k=>{
+    if(state.locks.has("s:"+k)) cfg.style[k] = state.style[k];
+  });
+  C.knobs.forEach(kn=>{
+    if(state.locks.has("k:"+kn.id) && state.cat[kn.id]!=null) cfg.cat[kn.id]=state.cat[kn.id];
+  });
+
+  /* brand kit defaults — applied last, but never over a locked field */
+  if(BRAND.on){
+    if(BRAND.aesthetic && !state.locks.has("s:aesthetic")) cfg.style.aesthetic = BRAND.aesthetic;
+    if(!state.locks.has("s:palette")){
+      if(BRAND.hex){ cfg.style.palette = "__hex"; cfg.style.hex = BRAND.hex; }
+      else if(BRAND.palette) cfg.style.palette = BRAND.palette;
+    }
+    if(BRAND.ar && !state.locks.has("s:ar")) cfg.style.ar = BRAND.ar;
+  }
+
+  /* roll harmonizer — Surprise should never even need a fix.
+     Resolution is origin-aware: a seed-curated pref outranks a rolled field. */
+  if(QUIET_PALETTES.indexOf(cfg.style.palette)>-1 && AES_COLOR[cfg.style.aesthetic]){
+    if(p.palette==null && !state.locks.has("s:palette")) cfg.style.palette="";
+    else if(!state.locks.has("s:aesthetic")) cfg.style.aesthetic="";
+  }
+  if(cfg.style.mood && (MOOD_CLASH[cfg.style.mood]||[]).indexOf(cfg.style.aesthetic)>-1){
+    if(p.mood==null && !state.locks.has("s:mood")) cfg.style.mood="";
+    else if(!state.locks.has("s:aesthetic")) cfg.style.aesthetic="";
+  }
+  if(FLAT_MEDIA.indexOf((cfg.style.medium||"").toLowerCase())>-1 && cfg.style.light){
+    if(p.light==null && !state.locks.has("s:light")) cfg.style.light="";
+    else if(p.medium==null && !state.locks.has("s:medium")) cfg.style.medium="";
+  }
+  if((cfg.style.palette==="monochrome"||cfg.style.palette==="high-contrast black and white") && cfg.style.light==="neon glow"){
+    if(p.light==null && !state.locks.has("s:light")) cfg.style.light="";
+    else if(p.palette==null && !state.locks.has("s:palette")) cfg.style.palette="";
+  }
+  return cfg;
+}
+
+function applyConfig(cfg){
+  state.idea = (cfg.idea==null) ? "" : String(cfg.idea);
+  document.getElementById("idea").value = state.idea;
+  Object.entries(cfg.cat).forEach(([id,val])=>{
+    state.cat[id]=val;
+    const el=document.querySelector('#catKnobs [data-k="'+id+'"]');
+    if(el) el.value=val;
+  });
+  const sset=(selId,key)=>{ state.style[key]=cfg.style[key]; const el=document.getElementById(selId); if(el) el.value=cfg.style[key]; };
+  sset("s_mood","mood"); sset("s_palette","palette"); sset("s_light","light"); sset("s_medium","medium"); sset("s_ar","ar"); sset("s_aesthetic","aesthetic");
+  state.style.hex = cfg.style.hex || "";
+  document.getElementById("s_hex").value = state.style.hex;
+  document.getElementById("hexWrap").style.display = (cfg.style.palette==="__hex") ? "flex" : "none";
+  state.detail=cfg.detail;
+  document.querySelectorAll("#s_detail button").forEach(b=>b.classList.toggle("on", b.getAttribute("data-v")===cfg.detail));
+  render();
+}
+
+/* sync every lock button's icon + its field highlight to state.locks */
+function refreshLockUI(){
+  document.querySelectorAll(".lock").forEach(lk=>{
+    const on=state.locks.has(lk.getAttribute("data-lock"));
+    lk.classList.toggle("on",on);
+    lk.innerHTML = on?LOCK_CLOSED:LOCK_OPEN;
+    const cont=lk.closest(".knob")||lk.closest(".idea-field");
+    if(cont) cont.classList.toggle("locked",on);
+  });
+}
+
+/* ---- history ---- */
+let histSeq=0;
+function pushHistory(cfg,name,cat){
+  const snap={id:++histSeq,name,category:cat,idea:cfg.idea,cat:{...cfg.cat},style:{...cfg.style},detail:cfg.detail};
+  state.history.unshift(snap);
+  if(state.history.length>12) state.history.length=12;
+  state.activeHist=snap.id;
+  renderHistory();
+  persist();
+}
+function renderHistory(){
+  const row=document.getElementById("histRow");
+  if(!state.history.length){ row.innerHTML='<span class="hist-empty">Your rolls collect here — tap any to restore and compare.</span>'; return; }
+  row.innerHTML = state.history.map(s=>{
+    const C=CATEGORIES[s.category];
+    const meta=[C.label.toLowerCase(), s.style.palette||"auto palette", s.style.ar].join(" · ");
+    return '<div class="hcard'+(s.id===state.activeHist?" on":"")+'" data-id="'+s.id+'">'+
+           '<div class="hc-top"><span class="hc-ic">'+C.icon+'</span><span class="hc-name">'+s.name+'</span></div>'+
+           '<div class="hc-meta">'+meta+'</div></div>';
+  }).join("");
+  row.querySelectorAll(".hcard").forEach(c=>{
+    c.onclick=()=>{ const s=state.history.find(h=>h.id===+c.getAttribute("data-id")); if(s) restoreSnapshot(s); };
+  });
+  updateSecCount("histCount", state.history.length, "historyRail");
+}
+/* update a collapsible section's count badge and keep its open height honest */
+function updateSecCount(badgeId, n, sectionId){
+  const b=document.getElementById(badgeId);
+  if(b){ if(n>0){ b.hidden=false; b.textContent=n; } else b.hidden=true; }
+  const sec=document.getElementById(sectionId);
+  if(sec && sec._recalc) sec._recalc();
+}
+function restoreSnapshot(s){
+  if(s.category!==state.category){
+    state.category=s.category; state.cat={}; state.model=CATEGORIES[s.category].rec;
+    [...state.locks].forEach(k=>{ if(k.indexOf("k:")===0) state.locks.delete(k); });
+    buildCats(); buildInspire(); buildKnobs(); syncModels();
+  }
+  applyConfig({idea:s.idea, cat:{...s.cat}, style:{...s.style}, detail:s.detail});
+  state.activeHist=s.id; renderHistory(); markSpark(null);
+  persist();
+}
+
+/* ============================================================
+   IR BUILDER
+   ============================================================ */
+function buildIR(){
+  const C = CATEGORIES[state.category];
+  const s = state.style;
+  const k = state.cat;
+  const detail = state.detail;
+
+  const ir = {
+    subject: (state.idea||"").trim(),
+    medium: s.medium || C.medium,
+    descriptors: [...C.base],
+    composition:[], lighting:s.light||"", mood:s.mood||"", palette:"", textContent:"", typoStyle:"",
+    ar: s.ar || C.ar,
+    negatives:[...C.neg],
+    detail
+  };
+
+  /* palette */
+  if(s.palette==="__hex" && s.hex) ir.palette = "brand colour "+s.hex+" as primary accent";
+  else if(s.palette) ir.palette = s.palette+" colour palette";
+
+  /* detail influence */
+  if(detail==="rich") ir.descriptors.push(...RICH_TOKENS);
+  if(detail==="min")  ir.descriptors.unshift(MIN_NOTE);
+
+  /* ---- per-category semantics ---- */
+  switch(state.category){
+    case "poster":
+      if(k.ptype) ir.descriptors.unshift(k.ptype+" poster");
+      if(k.layout) ir.composition.push(k.layout+" layout");
+      if(k.headline) { ir.textContent=k.headline; ir.typoStyle="strong display"; }
+      if(k.sub) ir.subText=k.sub;
+      break;
+    case "brand":
+      if(k.surface) ir.composition.push(k.surface+" format");
+      if(k.focus) ir.descriptors.unshift(k.focus+" as hero subject");
+      if(k.vibe) ir.descriptors.push(k.vibe+" aesthetic");
+      if(k.surface){ if(k.surface.includes("story")) ir.ar=s.ar||"9:16"; if(k.surface.includes("square")) ir.ar=s.ar||"1:1"; }
+      break;
+    case "ugc":
+      if(k.device) ir.descriptors.unshift("shot on "+k.device);
+      if(k.framing) ir.composition.push(k.framing+" shot");
+      if(k.setting) ir.composition.push("in a "+k.setting);
+      if(k.auth==="strong") ir.descriptors.push("grainy","slight motion blur","harsh on-camera flash or dim ambient light","cluttered everyday background");
+      ir.lighting = s.light || (k.auth==="strong" ? "messy natural light" : "soft window light");
+      break;
+    case "logo":
+      if(k.ltype) ir.descriptors.unshift(k.ltype);
+      if(k.lstyle) ir.descriptors.push(k.lstyle+" style");
+      if(k.name){ ir.textContent=k.name; ir.typoStyle=(k.lstyle||"clean")+" typography"; }
+      if(k.concept) ir.subject = (ir.subject? ir.subject+", ":"") + k.concept;
+      ir.lighting=""; ir.mood = s.mood||"";
+      ir.medium = s.medium && s.medium!=="flat vector" ? s.medium+" logo" : C.medium;
+      break;
+    case "promo":
+      if(k.ptype) ir.descriptors.unshift(k.ptype+" creative");
+      if(k.product) ir.subject = (ir.subject? ir.subject+", featuring ":"") + (k.product);
+      if(k.energy) ir.descriptors.push(k.energy+" tone");
+      if(k.headline){ ir.textContent=k.headline; ir.typoStyle="bold marketing"; }
+      break;
+  }
+
+  /* design-style injection — the Pinterest-grade layer (front-loaded so it always lands) */
+  if(s.aesthetic && AESTHETICS[s.aesthetic]){
+    ir.descriptors.unshift(...AESTHETICS[s.aesthetic]);
+    ir.aesthetic = s.aesthetic;
+  }
+
+  /* brand kit defaults at render time — fill only what the user left on Auto */
+  if(BRAND.on){
+    if(!ir.palette){
+      if(BRAND.hex) ir.palette = "brand colour "+BRAND.hex+" as primary accent";
+      else if(BRAND.palette) ir.palette = BRAND.palette+" colour palette";
+    }
+    if(!s.aesthetic && BRAND.aesthetic && AESTHETICS[BRAND.aesthetic]){
+      ir.descriptors.unshift(...AESTHETICS[BRAND.aesthetic]);
+      ir.aesthetic = BRAND.aesthetic;
+    }
+    if(!s.ar && BRAND.ar && ir.ar===C.ar) ir.ar = BRAND.ar;
+  }
+  /* quality finish — nudges every output toward art-directed, not generic */
+  if(state.category==="logo"){
+    ir.descriptors.push("iconic","perfectly balanced","refined");
+  } else if(detail!=="min"){
+    ir.descriptors.push("art-directed composition","strong focal point","editorial finish");
+  }
+
+  /* reference image carried through to the serializers */
+  ir.reference = {...state.reference};
+
+  /* coherence engine — enforce the rules before anything is serialized */
+  applyCoherence(ir);
+
+  // dedupe descriptors
+  ir.descriptors = [...new Set(ir.descriptors.filter(Boolean))];
+  ir.negatives = [...new Set(ir.negatives.filter(Boolean))];
+  return ir;
+}
+
+/* ============================================================
+   SERIALIZERS
+   ============================================================ */
+const cap = t => t? t.charAt(0).toUpperCase()+t.slice(1) : t;
+
+// ---- Midjourney: weighted comma phrases + params ----
+function serializeMJ(ir){
+  const parts=[];
+  if(ir.subject) parts.push(ir.subject);
+  parts.push(ir.medium);
+  ir.composition.forEach(c=>parts.push(c));
+  if(ir.textContent) parts.push('bold text reading "'+ir.textContent+'"');
+  ir.descriptors.forEach(d=>parts.push(d));
+  if(ir.lighting) parts.push(ir.lighting);
+  if(ir.palette) parts.push(ir.palette);
+  if(ir.mood) parts.push(ir.mood+" mood");
+  let prompt = parts.filter(Boolean).join(", ");
+
+  const params=[];
+  params.push("--ar "+ir.ar);
+  params.push("--stylize "+(ir.mjStylize ?? STYLIZE[ir.detail]));
+  if(ir.mjRaw) params.push("--style raw");
+  params.push("--v 6.1");
+  const neg = ir.negatives.join(", ");
+
+  return {
+    body: prompt,
+    params: params,
+    paramStr: params.join(" ") + (neg? " --no "+neg : ""),
+    negDisplay: neg,
+    negMode:"--no",
+    full: prompt + " " + params.join(" ") + (neg? " --no "+neg : "")
+  };
+}
+
+// ---- Nano Banana / GPT-Image: natural language prose ----
+function serializeNB(ir){
+  let s="";
+  const lead = ir.medium ? cap(ir.medium) : "Image";
+  s += lead + (ir.subject? " of "+ir.subject : "") + ". ";
+  if(ir.composition.length) s += cap(ir.composition.join(", ")) + ". ";
+  const looks = ir.descriptors.slice(0,11).join(", ");
+  if(looks) s += cap(looks)+". ";
+  if(ir.lighting) s += cap(ir.lighting)+". ";
+  if(ir.palette) s += cap(ir.palette)+". ";
+  if(ir.mood) s += "Overall "+ir.mood+" mood. ";
+  if(ir.textContent){
+    s += 'The text "'+ir.textContent+'" is rendered clearly and prominently';
+    s += ir.subText? ', with a smaller line reading "'+ir.subText+'". ' : ". ";
+  }
+  s += "Aspect ratio "+ir.ar+".";
+  const neg = ir.negatives.join(", ");
+  return {
+    body:s.trim(),
+    params:["aspect "+ir.ar],
+    negDisplay:neg,
+    negMode:"Avoid",
+    full: s.trim() + (neg? "  Avoid: "+neg+"." : "")
+  };
+}
+
+// ---- Ideogram: natural language, text-first ----
+function serializeID(ir){
+  let s="";
+  s += cap(ir.medium)+". ";
+  if(ir.subject) s += cap(ir.subject)+". ";
+  if(ir.textContent){
+    s += 'The text "'+ir.textContent+'"';
+    s += ir.typoStyle? " in "+ir.typoStyle+" typography" : "";
+    s += ", displayed prominently and spelled correctly";
+    s += ir.subText? '; smaller text reading "'+ir.subText+'". ' : ". ";
+  }
+  if(ir.composition.length) s += cap(ir.composition.join(", "))+". ";
+  const looks = ir.descriptors.slice(0,10).join(", ");
+  if(looks) s += cap(looks)+". ";
+  if(ir.palette) s += cap(ir.palette)+". ";
+  if(ir.lighting) s += cap(ir.lighting)+". ";
+  if(ir.mood) s += cap(ir.mood)+" mood.";
+  const neg = ir.negatives.join(", ");
+  return {
+    body:s.trim(),
+    params:["--ar "+ir.ar],
+    negDisplay:neg,
+    negMode:"Avoid",
+    full: s.trim() + " --ar "+ir.ar + (neg? "  Avoid: "+neg+"." : "")
+  };
+}
+
+const SERIALIZE = {mj:serializeMJ, nb:serializeNB, id:serializeID, fl:serializeFL, rc:serializeRC};
+
+/* reference-image mode: rewrite a serializer's output so the target model uses an attached image */
+function decorateReference(model, ser, ir){
+  const r = ir.reference;
+  if(!r || !r.on) return ser;
+  const phrase = {style:"overall style and aesthetic", composition:"composition and layout", subject:"main subject", color:"colour palette"}[r.borrow] || "style";
+  const word  = {subtle:"loosely", bal:"closely", strong:"very closely"}[r.strength];
+  if(model==="mj"){
+    const w = {subtle:30, bal:60, strong:100}[r.strength];
+    const flag = (r.borrow==="style"||r.borrow==="color")
+      ? ("--sref <paste image URL> --sw "+w)
+      : ("--cref <paste image URL> --cw "+w);
+    ser.params = [...ser.params, flag];
+    ser.full   = ser.full + " " + flag;
+  } else {
+    const strengthNum = {subtle:0.35, bal:0.6, strong:0.85}[r.strength];
+    const prefix = model==="fl"
+      ? "Image-to-image from the attached reference ("+phrase+", strength "+strengthNum+"). "
+      : model==="id"
+        ? "Remix the attached reference image, preserving its "+phrase+". "
+        : model==="rc"
+          ? "Use the attached image as a "+phrase+" reference. "
+          : "Using the attached reference image, match its "+phrase+" "+word+". ";
+    ser.body = prefix + ser.body;
+    ser.full = prefix + ser.full;
+  }
+  ser.refNote = "Attach your image in "+MODEL_NAME[model]+" — Imagend writes the instruction, your model reads the pixels.";
+  return ser;
+}
+
+// ---- Flux: dense descriptive natural-language clauses, no params ----
+function serializeFL(ir){
+  const seg=[];
+  let lead = cap(ir.medium||"image");
+  if(ir.subject) lead += " of "+ir.subject;
+  seg.push(lead);
+  ir.composition.forEach(c=>seg.push(c));
+  ir.descriptors.slice(0,12).forEach(d=>seg.push(d));
+  if(ir.lighting) seg.push(ir.lighting);
+  if(ir.palette) seg.push(ir.palette);
+  if(ir.mood) seg.push(ir.mood+" atmosphere");
+  if(ir.textContent) seg.push('with clear legible text reading "'+ir.textContent+'"');
+  const body = seg.filter(Boolean).join(", ");
+  const neg = ir.negatives.join(", ");
+  return {
+    body: body + ". Aspect ratio "+ir.ar+".",
+    params:["aspect "+ir.ar],
+    negDisplay:neg, negMode:"Avoid",
+    full: body + ". Aspect ratio "+ir.ar+"." + (neg? " Avoid: "+neg+"." : "")
+  };
+}
+
+// ---- Recraft: description + explicit style family + aspect (brand/vector strength) ----
+function recraftStyle(ir){
+  const m=(ir.medium||"").toLowerCase();
+  if(state.category==="logo") return ir.descriptors.some(d=>/abstract mark|pictorial/.test(d)) ? "icon" : "vector_illustration";
+  if(/flat vector|vector|line art/.test(m)) return "vector_illustration";
+  if(/illustration|watercolor|oil painting|risograph|anime|matte painting|paper collage|charcoal|claymation|double exposure/.test(m)) return "digital_illustration";
+  return "realistic_image";
+}
+function serializeRC(ir){
+  const style=recraftStyle(ir);
+  let s = cap(ir.medium||"design")+(ir.subject? " of "+ir.subject : "")+". ";
+  if(ir.composition.length) s += cap(ir.composition.join(", "))+". ";
+  if(ir.textContent){ s += 'Include the text "'+ir.textContent+'" rendered cleanly'+(ir.typoStyle?" in "+ir.typoStyle:"")+". "; }
+  const looks=ir.descriptors.slice(0,10).join(", ");
+  if(looks) s += cap(looks)+". ";
+  if(ir.palette) s += cap(ir.palette)+". ";
+  if(ir.lighting) s += cap(ir.lighting)+". ";
+  if(ir.mood) s += cap(ir.mood)+" mood. ";
+  s += "Style: "+style+". Aspect ratio "+ir.ar+".";
+  const neg=ir.negatives.join(", ");
+  return {
+    body:s.trim(), style:style,
+    params:["style "+style, "aspect "+ir.ar],
+    negDisplay:neg, negMode:"Avoid",
+    full: s.trim()+(neg? " Avoid: "+neg+"." : "")
+  };
+}
+
+/* model-specific rationale */
+function rationale(model, ir){
+  if(model==="mj") return "Built for <b>Midjourney v7</b>: weighted comma phrases front-loaded by importance, plus structural params. <b>--stylize "+(ir.mjStylize ?? STYLIZE[ir.detail])+"</b> matches your detail level"+(ir.mjRaw? ", <b>--style raw</b> keeps it photoreal":"")+"; negatives ride in <b>--no</b>.";
+  if(model==="nb") return "Built for <b>Nano Banana / GPT-Image</b>: full natural-language scene description — these models read prose, not keyword soup. Negatives become an explicit <b>Avoid:</b> instruction since there's no negative param.";
+  if(model==="fl") return "Built for <b>Flux</b>: dense descriptive clauses without Midjourney-style params — Flux rewards rich detail in natural phrasing. Aspect ratio is stated plainly and negatives ride in an <b>Avoid:</b> line.";
+  if(model==="rc") return "Built for <b>Recraft</b>: a clean description plus an explicit <b>Style: "+recraftStyle(ir)+"</b> family — Recraft keys off its style system, which is why it holds brand and vector consistency. Text is flagged to render cleanly.";
+  return "Built for <b>Ideogram</b>: text-first phrasing — the in-image copy is quoted and flagged to spell correctly, which is why it's the pick for "+(state.category==="logo"?"logos":"text-heavy work")+".";
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render(){
+  const ir = buildIR();
+  const ser = decorateReference(state.model, SERIALIZE[state.model](ir), ir);
+  const pt = document.getElementById("promptText");
+
+  if(!ir.subject && !ir.textContent){
+    pt.innerHTML = '<span class="empty">Type an idea above and Imagend will shape it into a '+MODEL_NAME[state.model]+' prompt…</span>';
+    document.getElementById("chips").innerHTML="";
+    document.getElementById("negBox").style.display="none";
+    document.getElementById("fixBox").style.display="none";
+    document.getElementById("why").innerHTML="";
+    const _gg=document.getElementById("genGate"); if(_gg) _gg.style.display="none";
+    const _pb=document.getElementById("promptBox"); if(_pb) _pb.style.display="block";
+    generatedPrompt = "";
+    if(!promptEditing) manualPrompt = "";
+    render._copy = "";
+    syncPromptPreview();
+    persist();
+    return;
+  }
+
+  // build colourised display
+  let disp = escapeHtml(ser.body);
+  if(state.model==="mj"){
+    const paramHtml = ser.params.map(p=>'<span class="par">'+escapeHtml(p)+'</span>').join(" ");
+    let negHtml = (state.negOn && ser.negDisplay)? ' <span class="neg">--no '+escapeHtml(ser.negDisplay)+'</span>' : "";
+    disp = disp + " " + paramHtml + negHtml;
+  } else {
+    // highlight quoted text
+    disp = disp.replace(/&quot;([^&]*?)&quot;/g,'&quot;<span class="em">$1</span>&quot;');
+    disp = disp.replace(/(--ar [0-9:]+|Aspect ratio [0-9:]+|Style: [a-z_]+|--sref [^ ]+ --sw [0-9]+|--cref [^ ]+ --cw [0-9]+)/g,'<span class="par">$1</span>');
+  }
+  pt.innerHTML = disp;
+
+  // chips
+  const chips=[];
+  chips.push('<span class="chip">model · <b>'+MODEL_NAME[state.model]+'</b></span>');
+  if(BRAND.on) chips.push('<span class="chip">kit · <b>'+escapeHtml(BRAND.name||"on")+'</b></span>');
+  chips.push('<span class="chip">ratio · <b>'+ir.ar+'</b></span>');
+  if(ir.aesthetic) chips.push('<span class="chip">style · <b>'+ir.aesthetic+'</b></span>');
+  if(state.model==="mj") chips.push('<span class="chip">stylize · <b>'+(ir.mjStylize ?? STYLIZE[ir.detail])+'</b></span>');
+  if(state.model==="rc" && ser.style) chips.push('<span class="chip">recraft · <b>'+ser.style+'</b></span>');
+  if(ir.reference && ir.reference.on) chips.push('<span class="chip">ref · <b>'+ir.reference.borrow+'</b></span>');
+  if(ir.fixes && ir.fixes.length) chips.push('<span class="chip">⚖ fixes · <b>'+ir.fixes.length+'</b></span>');
+  chips.push('<span class="chip">detail · <b>'+({min:"minimal",bal:"balanced",rich:"rich"})[ir.detail]+'</b></span>');
+  document.getElementById("chips").innerHTML = chips.join("");
+
+  // negatives
+  const nb = document.getElementById("negBox");
+  if(ser.negDisplay){
+    nb.style.display="block";
+    document.getElementById("negText").textContent = ser.negDisplay;
+    const nt=document.getElementById("negToggle"); if(nt) nt.checked = state.negOn;
+    const nc=document.getElementById("negCap"); if(nc) nc.textContent = state.negOn? "In prompt" : "Off";
+    nb.classList.toggle("off", !state.negOn);
+  }
+  else nb.style.display="none";
+
+  // coherence fixes — the brain shows its work
+  const fb = document.getElementById("fixBox");
+  if(ir.fixes && ir.fixes.length){
+    fb.style.display="block";
+    document.getElementById("fixText").innerHTML = ir.fixes.map(f=>"· "+escapeHtml(f)).join("<br>");
+  } else fb.style.display="none";
+
+  // why
+  document.getElementById("why").innerHTML = rationale(state.model, ir) + (ser.refNote? ' <b style="color:var(--accent)">·</b> '+ser.refNote : "");
+
+  // gen-gate visibility
+  const _gg2=document.getElementById("genGate"), _pb2=document.getElementById("promptBox");
+  if(_gg2&&_pb2){ const lk=genLocked(); _gg2.style.display=lk?"block":"none"; _pb2.style.display=lk?"none":"block"; }
+  updateUserPill();
+
+  // stash for copy (respect the negatives toggle)
+  const copyStr = state.negOn ? ser.full : stripNeg(ser.full, ser);
+  if(generatedPrompt && generatedPrompt!==copyStr && manualPrompt){ manualPrompt=""; promptEditing=false; }
+  generatedPrompt = copyStr;
+  render._copy = manualPrompt || copyStr;
+  syncPromptPreview(ir);
+  if(typeof promptActedFor==="string" && promptActedFor!==render._copy && typeof resetPromptActed==="function") resetPromptActed();
+  persist();
+}
+
+function syncPromptPreview(ir){
+  const pt=document.getElementById("promptText"), ed=document.getElementById("promptEdit"), grid=document.getElementById("breakdownGrid");
+  const status=document.getElementById("promptStatus"), reset=document.getElementById("resetPromptBtn"), edit=document.getElementById("editPromptBtn");
+  if(!pt||!ed||!grid) return;
+  const isBreak=promptTab==="breakdown";
+  pt.style.display=(!isBreak&&!promptEditing)?"block":"none";
+  ed.style.display=(!isBreak&&promptEditing)?"block":"none";
+  grid.style.display=isBreak?"grid":"none";
+  if(promptEditing && ed.value!==manualPrompt) ed.value=manualPrompt||generatedPrompt;
+  if(status){ status.textContent=manualPrompt?"Edited":"Generated"; status.classList.toggle("edited",!!manualPrompt); }
+  if(reset) reset.style.display=manualPrompt?"inline-block":"none";
+  if(edit) edit.textContent=promptEditing?"✓ Done editing":"✎ Edit manually";
+  const a=document.getElementById("promptTabBtn"), b=document.getElementById("breakdownTabBtn");
+  if(a) a.classList.toggle("on",!isBreak); if(b) b.classList.toggle("on",isBreak);
+  if(ir){
+    const C=CATEGORIES[state.category]||{};
+    const vals=[
+      ["Category",C.label||state.category],["Type",state.cat.type||state.cat.format||state.cat.use||"Auto"],
+      ["Vibe",ir.aesthetic||state.style.aesthetic||"Auto"],["Mood",state.style.mood||"Auto"],
+      ["Palette",state.style.palette||state.style.hex||"Auto"],["Lighting",state.style.light||"Auto"],
+      ["Render",state.style.medium||"Auto"],["Aspect ratio",ir.ar||"Auto"],
+      ["Detail",({min:"Minimal",bal:"Balanced",rich:"Rich"})[state.detail]||state.detail]
+    ];
+    grid.innerHTML=vals.map(v=>'<div class="breakdown-item"><span>'+escapeHtml(String(v[0]))+'</span><b>'+escapeHtml(String(v[1]))+'</b></div>').join("");
+  }
+}
+
+function runSurprise(){
+  const cat=state.category, seeds=SEEDS[cat];
+  const i=Math.floor(Math.random()*seeds.length), sd=seeds[i], cfg=rollConfig(cat,sd);
+  applyConfig(cfg); markSpark(document.querySelector('#inspire .spark[data-i="'+i+'"]')); pushHistory(cfg,sd.name,cat);
+  const psec=document.querySelector('[data-collapse-key="prompt"]'); if(psec&&psec._open) psec._open();
+  setTimeout(()=>document.getElementById("promptBox")?.scrollIntoView({behavior:"smooth",block:"center"}),50);
+}
+
+function clearRack(){
+  state.idea=""; state.category="brand"; state.model="nb"; state.detail="bal"; state.cat={};
+  state.style={mood:"",palette:"",hex:"",light:"",medium:"",ar:"",aesthetic:""};
+  state.reference={on:false,borrow:"style",strength:"bal"}; state.negOn=true; state.locks.clear(); state.activeHist=null;
+  manualPrompt=""; generatedPrompt=""; promptEditing=false; promptTab="prompt"; lazyGuide={step:0,answers:{category:"",idea:"",hero:"",feel:"",surface:"",text:""}};
+  buildCats(); buildInspire(); buildKnobs(); syncModels();
+  document.getElementById("idea").value="";
+  ["s_mood","s_palette","s_light","s_medium","s_ar","s_aesthetic"].forEach(id=>{const e=document.getElementById(id);if(e)e.value="";});
+  const hx=document.getElementById("s_hex"); if(hx)hx.value=""; const hw=document.getElementById("hexWrap"); if(hw)hw.style.display="none";
+  document.querySelectorAll("#s_detail button").forEach(b=>b.classList.toggle("on",b.getAttribute("data-v")==="bal"));
+  const rt=document.getElementById("refToggle"); if(rt)rt.checked=false; const rb=document.getElementById("refBody"); if(rb)rb.style.display="none";
+  const rf=document.getElementById("refFile"); if(rf)rf.value=""; const th=document.getElementById("refThumb"); if(th)th.src=""; const rd=document.getElementById("refDrop"); if(rd)rd.classList.remove("has"); const rc=document.getElementById("refClear"); if(rc)rc.style.display="none";
+  const nt=document.getElementById("negToggle"); if(nt)nt.checked=true;
+  document.querySelectorAll(".done-cb").forEach(cb=>cb.checked=false);
+  document.querySelectorAll("[data-done-key]").forEach(sec=>sec.classList.remove("is-done","is-pending","is-acted"));
+  markSpark(null); refreshLockUI(); resetPromptActed(); render();
+  store.remove(K_STATE); toast("Rack cleared — ready for the next image");
+  document.getElementById("idea")?.focus();
+}
+
+
+function lazyEscape(v){ return escapeHtml(String(v==null?"":v)); }
+function lazySetOpen(open){
+  const m=document.getElementById("lazyGuideModal"); if(!m)return;
+  m.classList.toggle("open",!!open);
+  if(open){ lazyGuide={step:0,answers:{category:"",idea:"",hero:"",feel:"",surface:"",text:""}}; renderLazyGuide(); }
+}
+function lazyCategoryOptions(){
+  return [
+    ["poster","Poster / flyer","Event, movie, concert or information piece"],
+    ["brand","Brand visual / ad","Product, campaign or social brand image"],
+    ["promo","Promotion / sale","Launch, offer, discount or feature ad"],
+    ["ugc","UGC / creator post","Something candid that should feel user-made"],
+    ["logo","Logo / identity","A mark, wordmark, monogram or badge"],
+    ["decide","You decide","I just want the strongest fit"]
+  ];
+}
+function lazyHeroOptions(cat){
+  if(cat==="logo") return [["name","The name / letters"],["symbol","A symbol / icon"],["both","Both together"],["decide","You decide"]];
+  if(cat==="ugc") return [["person","The person"],["product","The product"],["moment","The real-life moment"],["decide","You decide"]];
+  if(cat==="poster") return [["headline","The headline"],["subject","The main image"],["offer","The key information / offer"],["atmosphere","The overall atmosphere"],["decide","You decide"]];
+  return [["product","The product"],["person","A person / lifestyle scene"],["headline","The message / headline"],["atmosphere","The overall atmosphere"],["decide","You decide"]];
+}
+const LAZY_FEELS={
+  clean:{label:"Clean & minimal",aesthetic:"minimalist",mood:"elegant",palette:"muted",light:"soft natural light",medium:"",detail:"min"},
+  premium:{label:"Premium & polished",aesthetic:"luxury editorial",mood:"luxurious",palette:"jewel tones",light:"studio softbox lighting",medium:"product photography",detail:"rich"},
+  bold:{label:"Bold & attention-grabbing",aesthetic:"editorial",mood:"bold & confident",palette:"vibrant",light:"dramatic chiaroscuro",medium:"",detail:"rich"},
+  warm:{label:"Warm & inviting",aesthetic:"editorial",mood:"serene",palette:"warm tones",light:"golden hour",medium:"photography",detail:"bal"},
+  playful:{label:"Fun & playful",aesthetic:"memphis",mood:"playful",palette:"candy pop",light:"high-key bright light",medium:"illustration",detail:"rich"},
+  dark:{label:"Dark & cinematic",aesthetic:"dark academia",mood:"mysterious",palette:"monochrome",light:"cinematic lighting",medium:"cinematic film still",detail:"rich"},
+  dreamy:{label:"Soft & dreamy",aesthetic:"surrealist",mood:"dreamy",palette:"pastel",light:"soft natural light",medium:"photography",detail:"rich"},
+  decide:{label:"You decide",aesthetic:"",mood:"",palette:"",light:"",medium:"",detail:"bal"}
+};
+function lazyFeelOptions(){ return Object.entries(LAZY_FEELS).map(([k,v])=>[k,v.label]); }
+function lazySurfaceOptions(cat){
+  if(cat==="logo") return [["square","Profile / app icon"],["website","Website / brand use"],["print","Printed material"],["many","Many places"],["decide","Not sure"]];
+  return [["instagram","Instagram post"],["story","Story / TikTok"],["website","Website / banner"],["print","Printed poster / flyer"],["billboard","Large-format / billboard"],["decide","Not sure"]];
+}
+function lazyButtonOptions(items, selected, cb){
+  return '<div class="lazy-options">'+items.map(x=>'<button class="lazy-option'+(selected===x[0]?' on':'')+'" type="button" data-lazy="'+lazyEscape(x[0])+'"><b>'+lazyEscape(x[1])+'</b>'+(x[2]?'<div style="font-weight:400;color:var(--muted);font-size:11px;margin-top:3px">'+lazyEscape(x[2])+'</div>':'')+'</button>').join('')+'</div>';
+}
+function lazyBindOptions(handler){ document.querySelectorAll('#lazyGuideBody [data-lazy]').forEach(b=>b.onclick=()=>handler(b.getAttribute('data-lazy'))); }
+function lazyPickCategory(){
+  const txt=(lazyGuide.answers.idea||"").toLowerCase();
+  if(/logo|wordmark|monogram|identity|brand mark/.test(txt)) return "logo";
+  if(/ugc|selfie|creator|testimonial video|phone photo/.test(txt)) return "ugc";
+  if(/sale|discount|offer|launch|promo|promotion|% off/.test(txt)) return "promo";
+  if(/poster|flyer|event|concert|festival|movie/.test(txt)) return "poster";
+  return "brand";
+}
+function lazyQuestionMeta(){
+  const a=lazyGuide.answers, step=lazyGuide.step;
+  if(step===0) return ["Question 1 of 5","What are you trying to make?","Pick the closest answer. You don't need to know the exact design category."];
+  if(step===1) return ["Question 2 of 5","Describe it like you're explaining it to a friend.","One rough sentence is enough. Tell me what it is and what it's for."];
+  if(step===2) return ["Question 3 of 5","What should people notice first?","This tells Imagend what deserves the strongest visual emphasis."];
+  if(step===3) return ["Question 4 of 5","How should it feel?","Choose the reaction you want. Imagend will translate it into design language."];
+  if(step===4) return ["Question 5 of 5","Where will people see it?","You choose the destination; Imagend chooses the technical format."];
+  return ["Ready","Here's what I understood","You can add exact words below if the design needs them, or generate immediately."];
+}
+function renderLazyGuide(){
+  const body=document.getElementById("lazyGuideBody"), prog=document.getElementById("lazyProgress"); if(!body||!prog)return;
+  const a=lazyGuide.answers, step=lazyGuide.step, meta=lazyQuestionMeta();
+  prog.style.width=Math.min(100,((step+1)/6)*100)+"%";
+  let h='<div class="lazy-qnum">'+meta[0]+'</div><div class="lazy-question">'+meta[1]+'</div><div class="lazy-help">'+meta[2]+'</div>';
+  if(step===0){
+    h+=lazyButtonOptions(lazyCategoryOptions(),a.category);
+  } else if(step===1){
+    h+='<textarea class="lazy-input" id="lazyIdea" placeholder="e.g. I need an Instagram poster for my bakery opening. I want the pastries to look irresistible.">'+lazyEscape(a.idea)+'</textarea>';
+  } else if(step===2){
+    h+=lazyButtonOptions(lazyHeroOptions(a.category==="decide"?lazyPickCategory():a.category),a.hero);
+  } else if(step===3){
+    h+=lazyButtonOptions(lazyFeelOptions(),a.feel);
+  } else if(step===4){
+    h+=lazyButtonOptions(lazySurfaceOptions(a.category==="decide"?lazyPickCategory():a.category),a.surface);
+  } else {
+    const cat=a.category==="decide"?lazyPickCategory():a.category, feel=LAZY_FEELS[a.feel]||LAZY_FEELS.decide;
+    const categoryLabel=(CATEGORIES[cat]||CATEGORIES.brand).label;
+    h+='<div class="lazy-ready">Imagend has enough to build this. The technical design controls will be filled for you.</div>'+
+      '<div class="lazy-summary">'+
+      '<div class="lazy-summary-row"><span>Making</span><b>'+lazyEscape(categoryLabel)+'</b></div>'+
+      '<div class="lazy-summary-row"><span>Idea</span><b>'+lazyEscape(a.idea||"Imagend will choose a strong starting concept")+'</b></div>'+
+      '<div class="lazy-summary-row"><span>Focus</span><b>'+lazyEscape(a.hero||"Imagend decides")+'</b></div>'+
+      '<div class="lazy-summary-row"><span>Feel</span><b>'+lazyEscape(feel.label)+'</b></div>'+
+      '<div class="lazy-summary-row"><span>Destination</span><b>'+lazyEscape(a.surface||"Auto")+'</b></div></div>';
+    if(cat==="poster"||cat==="promo"||cat==="logo") h+='<input class="lazy-text-input" id="lazyExactText" placeholder="Optional: exact words that must appear" value="'+lazyEscape(a.text)+'">';
+  }
+  h+='<div class="lazy-actions">';
+  if(step>0) h+='<button class="lazy-back" id="lazyBack" type="button">← Back</button>';
+  if(step===1) h+='<button class="fast-ghost" id="lazyDecideIdea" type="button">You decide</button><button class="fast-primary" id="lazyNext" type="button">Next →</button>';
+  if(step>=5) h+='<button class="fast-ghost" id="lazyStartOver" type="button">Start over</button><button class="fast-primary" id="lazyGenerate" type="button">✦ Build my prompt</button>';
+  h+='</div>'; body.innerHTML=h;
+  if(step===0) lazyBindOptions(v=>{a.category=v; lazyGuide.step++; renderLazyGuide();});
+  else if(step===1){ const inp=document.getElementById('lazyIdea'); inp.focus(); document.getElementById('lazyNext').onclick=()=>{a.idea=inp.value.trim(); lazyGuide.step++;renderLazyGuide();}; document.getElementById('lazyDecideIdea').onclick=()=>{a.idea="";lazyGuide.step++;renderLazyGuide();}; }
+  else if(step===2) lazyBindOptions(v=>{a.hero=v;lazyGuide.step++;renderLazyGuide();});
+  else if(step===3) lazyBindOptions(v=>{a.feel=v;lazyGuide.step++;renderLazyGuide();});
+  else if(step===4) lazyBindOptions(v=>{a.surface=v;lazyGuide.step++;renderLazyGuide();});
+  if(step>0&&document.getElementById('lazyBack')) document.getElementById('lazyBack').onclick=()=>{lazyGuide.step--;renderLazyGuide();};
+  if(step>=5){
+    document.getElementById('lazyStartOver').onclick=()=>{lazyGuide={step:0,answers:{category:"",idea:"",hero:"",feel:"",surface:"",text:""}};renderLazyGuide();};
+    const tx=document.getElementById('lazyExactText'); if(tx) tx.oninput=e=>a.text=e.target.value;
+    document.getElementById('lazyGenerate').onclick=()=>{ if(tx)a.text=tx.value.trim(); applyLazyGuide(); };
+  }
+}
+function lazyMapSurface(cat,surface){
+  const ar={instagram:"4:5",story:"9:16",website:"16:9",print:"2:3",billboard:"16:9",square:"1:1",many:"1:1",decide:""}[surface]||"";
+  if(cat==="brand"){
+    const sf={instagram:"social square",story:"story / vertical",website:"website hero banner",billboard:"billboard",print:"social square",decide:"website hero banner"}[surface]||"website hero banner";
+    state.cat.surface=sf;
+  }
+  return ar;
+}
+function applyLazyGuide(){
+  const a=lazyGuide.answers; let cat=a.category==="decide"?lazyPickCategory():a.category; if(!CATEGORIES[cat])cat="brand";
+  state.category=cat; state.model=CATEGORIES[cat].rec; state.cat={}; state.locks.clear();
+  buildCats(); buildInspire(); buildKnobs(); syncModels();
+  state.idea=a.idea||pick(SEEDS[cat]).idea;
+  const feel=LAZY_FEELS[a.feel]||LAZY_FEELS.decide;
+  state.style.aesthetic=feel.aesthetic; state.style.mood=feel.mood; state.style.palette=feel.palette; state.style.hex=""; state.style.light=feel.light; state.style.medium=(cat==="logo"?"":feel.medium); state.style.ar=lazyMapSurface(cat,a.surface); state.detail=feel.detail;
+  const hero=a.hero;
+  if(cat==="brand"){
+    if(hero==="product")state.cat.focus="product"; else if(hero==="person")state.cat.focus="lifestyle scene"; else if(hero==="atmosphere")state.cat.focus="abstract concept";
+    state.cat.vibe= a.feel==="premium"?"premium minimal":a.feel==="bold"?"bold & energetic":a.feel==="warm"?"warm & human":a.feel==="dark"?"tech / futuristic":"premium minimal";
+  } else if(cat==="poster"){
+    state.cat.layout=hero==="headline"?"bold typographic grid":hero==="subject"?"centered hero":hero==="atmosphere"?"full-bleed image with text band":"rule-of-thirds";
+    state.cat.ptype=/concert|music|gig|festival/i.test(state.idea)?"concert":/movie|film/i.test(state.idea)?"movie":"event";
+    if(a.text) state.cat.headline=a.text;
+  } else if(cat==="promo"){
+    state.cat.energy=a.feel==="premium"?"premium calm":a.feel==="playful"?"playful":a.feel==="warm"?"trustworthy":"urgent / punchy";
+    state.cat.ptype=/sale|discount|off/i.test(state.idea)?"sale / discount":/feature/i.test(state.idea)?"feature highlight":"product launch";
+    if(a.text)state.cat.headline=a.text;
+  } else if(cat==="logo"){
+    state.cat.ltype=hero==="name"?"wordmark":hero==="symbol"?"pictorial mark":hero==="both"?"combination mark":"abstract mark";
+    state.cat.lstyle=a.feel==="premium"?"elegant serif":a.feel==="bold"?"bold sans":a.feel==="playful"?"hand-drawn":"flat geometric";
+    if(a.text)state.cat.name=a.text;
+  } else if(cat==="ugc"){
+    state.cat.framing=hero==="person"?"selfie":hero==="product"?"handheld product":"point-of-view"; state.cat.device="iPhone main camera"; state.cat.setting="café"; state.cat.auth=a.feel==="bold"?"strong":"subtle";
+  }
+  // reflect state into rebuilt controls and style UI
+  buildKnobs(); document.getElementById('idea').value=state.idea;
+  const vals={s_aesthetic:state.style.aesthetic,s_mood:state.style.mood,s_palette:state.style.palette,s_light:state.style.light,s_medium:state.style.medium,s_ar:state.style.ar};
+  Object.entries(vals).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.value=v||"";});
+  document.querySelectorAll('#s_detail button').forEach(b=>b.classList.toggle('on',b.getAttribute('data-v')===state.detail));
+  manualPrompt="";promptEditing=false;promptTab="prompt"; render(); lazySetOpen(false);
+  const psec=document.querySelector('[data-collapse-key="prompt"]'); if(psec&&psec._open)psec._open();
+  setTimeout(()=>document.getElementById('promptBox')?.scrollIntoView({behavior:'smooth',block:'center'}),80);
+  toast("Lazy Guide built your design direction");
+}
+
+function setHowTo(open){ document.getElementById("howToModal")?.classList.toggle("open",!!open); }
+
+function escapeHtml(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+/* ============================================================
+   UI WIRING
+   ============================================================ */
+function buildCats(){
+  const el=document.getElementById("cats");
+  el.innerHTML="";
+  Object.entries(CATEGORIES).forEach(([key,c])=>{
+    const d=document.createElement("div");
+    d.className="cat"+(key===state.category?" active":"");
+    d.innerHTML='<span class="ic">'+c.icon+'</span><span class="nm">'+c.label+'</span>';
+    d.onclick=()=>{ state.category=key; state.cat={}; state.model=c.rec; [...state.locks].forEach(k=>{ if(k.indexOf("k:")===0) state.locks.delete(k); }); buildCats(); buildInspire(); buildKnobs(); syncModels(); render(); };
+    el.appendChild(d);
+  });
+}
+
+function buildKnobs(){
+  const C=CATEGORIES[state.category];
+  const wrap=document.getElementById("catKnobs");
+  let h='<div class="sec-label">'+C.label+' settings</div><div class="knobs">';
+  C.knobs.forEach(kn=>{
+    const full = (kn.type==="text") ? " full":"";
+    h+='<div class="knob'+full+'"><div class="klab"><span>'+kn.label+'</span><button class="lock" data-lock="k:'+kn.id+'" title="Pin this field"></button></div>';
+    if(kn.type==="select"){
+      h+='<select data-k="'+kn.id+'">';
+      kn.opts.forEach((o,i)=>{ h+='<option'+(i===0?" selected":"")+'>'+o+'</option>'; });
+      h+='</select>';
+      if(!state.cat[kn.id]) state.cat[kn.id]=kn.opts[0];
+    } else {
+      h+='<input type="text" data-k="'+kn.id+'" placeholder="'+(kn.ph||"")+'">';
+    }
+    h+='</div>';
+  });
+  h+='</div>';
+  wrap.innerHTML=h;
+  wrap.querySelectorAll("[data-k]").forEach(inp=>{
+    const id=inp.getAttribute("data-k");
+    if(state.cat[id]!=null && state.cat[id]!=="") inp.value=state.cat[id];
+    inp.addEventListener("input",()=>{ state.cat[id]=inp.value; render(); });
+    inp.addEventListener("change",()=>{ state.cat[id]=inp.value; render(); });
+  });
+  refreshLockUI();
+}
+
+function buildInspire(){
+  const cat=state.category, seeds=SEEDS[cat];
+  const tKey = todaysStyle();
+  let h='<div class="inspire"><div class="insp-head"><span class="insp-title">✦ Top-grade starts</span></div><div class="sparks">'+
+        '<button class="spark today" id="todayStyle" title="Apply today\'s design style">☀ Today: '+tKey+'</button>';
+  seeds.forEach((sd,i)=>{ h+='<button class="spark" data-i="'+i+'">'+sd.name+'</button>'; });
+  h+='</div></div>';
+  document.getElementById("inspire").innerHTML=h;
+  document.getElementById("todayStyle").onclick=()=>{
+    state.style.aesthetic=tKey;
+    const sel=document.getElementById("s_aesthetic"); if(sel) sel.value=tKey;
+    toast("Today's style applied: "+tKey);
+    render();
+  };
+  document.querySelectorAll("#inspire .spark").forEach(b=>{
+    b.onclick=()=>{ const sd=seeds[+b.getAttribute("data-i")]; const cfg=rollConfig(cat, sd); applyConfig(cfg); markSpark(b); pushHistory(cfg, sd.name, cat); };
+  });
+  const localSurprise=document.getElementById("surpriseBtn");
+  if(localSurprise) localSurprise.onclick=()=>runSurprise();
+}
+function markSpark(b){ document.querySelectorAll("#inspire .spark").forEach(x=>x.classList.remove("on")); if(b) b.classList.add("on"); }
+
+function syncModels(){
+  document.querySelectorAll("#models button").forEach(b=>{
+    const m=b.getAttribute("data-m");
+    b.classList.toggle("on", m===state.model);
+    b.classList.toggle("rec-on", m===CATEGORIES[state.category].rec && m!==state.model);
+  });
+}
+
+/* ============================================================
+   PERSISTENCE + SHARE + LIBRARY + BRAND KIT + ONBOARDING
+   ============================================================ */
+let toastT;
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2400);
+}
+
+function copyText(t){
+  return new Promise((resolve,reject)=>{
+    function fallback(){
+      try{
+        const ta=document.createElement("textarea");
+        ta.value=t;
+        ta.setAttribute("readonly","");
+        ta.style.position="fixed"; ta.style.top="0"; ta.style.left="0";
+        ta.style.width="1px"; ta.style.height="1px"; ta.style.opacity="0";
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        try{ ta.setSelectionRange(0, t.length); }catch(e){}
+        let ok=false;
+        try{ ok=document.execCommand("copy"); }catch(e){ ok=false; }
+        ta.remove();
+        ok ? resolve() : reject(new Error("copy command was blocked"));
+      }catch(e){ reject(e); }
+    }
+    // Modern API first; if it rejects (common inside iframes / srcdoc), fall back.
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(resolve, fallback);
+    } else {
+      fallback();
+    }
+  });
+}
+
+/* strip the negative/avoid tail from a serialized prompt when the user toggles it off */
+function stripNeg(full, ser){
+  if(!ser || !ser.negDisplay) return full;
+  const marker = (ser.negMode==="--no") ? "--no " : (ser.negMode+": ");
+  const needle = marker + ser.negDisplay;
+  let i = full.lastIndexOf(needle);
+  if(i<0) return full;
+  while(i>0 && full.charAt(i-1)===" ") i--;
+  return full.slice(0,i).replace(/\s+$/,"");
+}
+
+/* base64url <-> JSON, unicode-safe */
+const b64u = {
+  enc(o){
+    const bytes=new TextEncoder().encode(JSON.stringify(o));
+    let bin=""; bytes.forEach(b=>bin+=String.fromCharCode(b));
+    return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  },
+  dec(str){
+    try{
+      let s=str.replace(/-/g,"+").replace(/_/g,"/");
+      while(s.length%4) s+="=";
+      const bytes=Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+      return JSON.parse(new TextDecoder().decode(bytes));
+    }catch(e){ return null; }
+  }
+};
+
+function snapshotConfig(){
+  return {
+    idea:state.idea, category:state.category, model:state.model, detail:state.detail,
+    cat:{...state.cat}, style:{...state.style},
+    negOn:state.negOn,
+    reference:{on:state.reference.on, borrow:state.reference.borrow, strength:state.reference.strength}
+  };
+}
+
+function persist(){
+  if(!bootDone) return;
+  store.set(K_STATE, JSON.stringify({
+    v:1, sessions, hintDismissed,
+    config:snapshotConfig(),
+    history:state.history,
+    activeHist:state.activeHist,
+    locks:[...state.locks]
+  }));
+}
+function readSavedState(){
+  try{ const raw=store.get(K_STATE); return raw? JSON.parse(raw) : null; }catch(e){ return null; }
+}
+
+function saveBrand(){ store.set(K_BRAND, JSON.stringify(BRAND)); }
+function loadBrand(){
+  try{ const raw=store.get(K_BRAND); if(raw) BRAND={...BRAND, ...JSON.parse(raw)}; }catch(e){}
+}
+function saveLibrary(){ store.set(K_LIB, JSON.stringify(LIBRARY)); }
+function loadLibrary(){
+  try{ const raw=store.get(K_LIB); const a=raw? JSON.parse(raw):null; if(Array.isArray(a)) LIBRARY=a; }catch(e){}
+}
+
+/* push reference settings into state + UI (image itself stays local-only, never stored) */
+function setReference(r){
+  state.reference.on = !!r.on;
+  state.reference.borrow = r.borrow || "style";
+  state.reference.strength = r.strength || "bal";
+  const t=document.getElementById("refToggle");
+  t.checked = state.reference.on;
+  document.getElementById("refBody").style.display = state.reference.on? "block":"none";
+  document.getElementById("refBorrow").value = state.reference.borrow;
+  document.querySelectorAll("#refStrength button").forEach(b=>b.classList.toggle("on", b.getAttribute("data-v")===state.reference.strength));
+  render();
+}
+
+/* full-config restore — used by library, share links, and session restore */
+function loadConfig(cfg){
+  if(!cfg || !CATEGORIES[cfg.category]) return;
+  if(cfg.category!==state.category){
+    state.category=cfg.category; state.cat={};
+    [...state.locks].forEach(k=>{ if(k.indexOf("k:")===0) state.locks.delete(k); });
+    buildCats(); buildInspire(); buildKnobs();
+  }
+  state.model = MODEL_NAME[cfg.model]? cfg.model : CATEGORIES[state.category].rec;
+  syncModels();
+  applyConfig({
+    idea:cfg.idea||"",
+    cat:{...(cfg.cat||{})},
+    style:{mood:"",palette:"",hex:"",light:"",medium:"",ar:"",aesthetic:"",...(cfg.style||{})},
+    detail:["min","bal","rich"].indexOf(cfg.detail)>-1? cfg.detail : "bal"
+  });
+  state.negOn = (cfg.negOn===false) ? false : true;
+  setReference(cfg.reference||{on:false});
+  state.activeHist=null; renderHistory(); markSpark(null);
+  refreshLockUI();
+}
+
+/* ---- share by URL: config -> #s= base64url, lean payload ---- */
+function buildShareLink(){
+  const s={};
+  Object.keys(state.style).forEach(k=>{ if(state.style[k]) s[k]=state.style[k]; });
+  const k={};
+  Object.keys(state.cat).forEach(id=>{ if(state.cat[id]) k[id]=state.cat[id]; });
+  const p={c:state.category, m:state.model, d:state.detail, i:state.idea, k, s};
+  if(state.reference.on) p.r={b:state.reference.borrow, t:state.reference.strength};
+  return location.origin + location.pathname + "#s=" + b64u.enc(p);
+}
+function readShareHash(){
+  const m=(location.hash||"").match(/[#&]s=([A-Za-z0-9\-_]+)/);
+  return m? b64u.dec(m[1]) : null;
+}
+function applyShared(p){
+  loadConfig({
+    category:p.c, model:p.m, detail:p.d, idea:p.i||"",
+    cat:p.k||{}, style:p.s||{},
+    reference:p.r? {on:true, borrow:p.r.b, strength:p.r.t} : {on:false}
+  });
+}
+
+/* ---- prompt library ---- */
+function saveToLibrary(){
+  const cfg=snapshotConfig();
+  if(!cfg.idea.trim() && !(cfg.cat.headline||cfg.cat.name)){ toast("Type an idea first — then save your winner"); return; }
+  const trimmed=cfg.idea.trim();
+  const name = trimmed? (trimmed.length>28? trimmed.slice(0,28)+"…" : trimmed) : CATEGORIES[cfg.category].label+" setup";
+  const first = LIBRARY.length===0;
+  LIBRARY.unshift({id:Date.now(), name, cfg});
+  if(LIBRARY.length>24) LIBRARY.length=24;
+  saveLibrary(); renderLibrary();
+  toast(first? "Saved — find it in your library at the bottom, click to reload anytime" : "Saved to library");
+  const sb=document.getElementById("saveBtn");
+  sb.classList.add("done"); setTimeout(()=>sb.classList.remove("done"),1200);
+}
+function renderLibrary(){
+  const row=document.getElementById("libRow");
+  if(!LIBRARY.length){
+    row.innerHTML='<span class="hist-empty">Nothing saved yet — lock in your first winner with the bookmark next to the prompt.</span>';
+    updateSecCount("libCount", 0, "libraryRail");
+    return;
+  }
+  row.innerHTML="";
+  LIBRARY.forEach(item=>{
+    const C=CATEGORIES[item.cfg.category]||CATEGORIES.brand;
+    const pal=item.cfg.style.palette==="__hex"? (item.cfg.style.hex||"custom hex") : (item.cfg.style.palette||"auto palette");
+    const d=document.createElement("div");
+    d.className="hcard lib";
+    d.innerHTML='<div class="hc-top"><span class="hc-ic">'+C.icon+'</span><span class="hc-name" data-nm></span>'+
+      '<button class="lib-btn" data-act="ren" title="Rename">✎</button>'+
+      '<button class="lib-btn" data-act="del" title="Delete">✕</button></div>'+
+      '<div class="hc-meta"></div>';
+    d.querySelector("[data-nm]").textContent=item.name;
+    d.querySelector(".hc-meta").textContent=[C.label.toLowerCase(), pal, item.cfg.style.ar||C.ar].join(" · ");
+    d.onclick=e=>{
+      if(e.target.closest(".lib-btn") || e.target.tagName==="INPUT") return;
+      loadConfig(item.cfg); toast('Loaded "'+item.name+'"');
+    };
+    d.querySelector('[data-act="del"]').onclick=e=>{
+      e.stopPropagation();
+      LIBRARY=LIBRARY.filter(x=>x.id!==item.id);
+      saveLibrary(); renderLibrary();
+    };
+    d.querySelector('[data-act="ren"]').onclick=e=>{ e.stopPropagation(); beginRename(d,item); };
+    row.appendChild(d);
+  });
+  updateSecCount("libCount", LIBRARY.length, "libraryRail");
+}
+function beginRename(card,item){
+  const span=card.querySelector("[data-nm]");
+  if(!span) return;
+  const inp=document.createElement("input");
+  inp.className="lib-rename"; inp.value=item.name; inp.maxLength=40;
+  span.replaceWith(inp); inp.focus(); inp.select();
+  let done=false;
+  const finish=()=>{
+    if(done) return; done=true;
+    const v=inp.value.trim();
+    if(v) item.name=v;
+    saveLibrary(); renderLibrary();
+  };
+  inp.addEventListener("keydown",ev=>{
+    if(ev.key==="Enter") inp.blur();
+    if(ev.key==="Escape"){ inp.value=item.name; inp.blur(); }
+  });
+  inp.addEventListener("blur",finish);
+  inp.addEventListener("click",ev=>ev.stopPropagation());
+}
+
+/* ---- copy all 5 model dialects in one labeled block ---- */
+function copyAllModels(){
+  const probe=buildIR();
+  if(!probe.subject && !probe.textContent){ toast("Type an idea first"); return; }
+  const txt=["mj","nb","id","fl","rc"].map(m=>{
+    const ir=buildIR();
+    const ser=decorateReference(m, SERIALIZE[m](ir), ir);
+    return MODEL_NAME[m]+"\n"+(state.negOn ? ser.full : stripNeg(ser.full, ser));
+  }).join("\n\n");
+  copyText(txt).then(()=>toast("All 5 prompts copied")).catch(()=>toast("Couldn't reach the clipboard"));
+}
+
+/* ---- brand kit UI ---- */
+function populateBrandKit(){
+  document.getElementById("bk_aesthetic").innerHTML =
+    '<option value="">None</option>'+Object.keys(AESTHETICS).map(k=>'<option>'+k+'</option>').join("");
+  const pals=["monochrome","warm tones","cool tones","pastel","vibrant","earthy","neon","muted","duotone","jewel tones","sunset gradient","high-contrast black and white","autumnal","oceanic blues","candy pop"];
+  document.getElementById("bk_palette").innerHTML =
+    '<option value="">None</option>'+pals.map(p=>'<option>'+p+'</option>').join("");
+  document.getElementById("bk_ar").innerHTML =
+    '<option value="">None</option>'+["1:1","4:5","2:3","3:2","16:9","9:16"].map(a=>'<option>'+a+'</option>').join("");
+}
+function bindBrandKit(){
+  const t=document.getElementById("bkToggle"), body=document.getElementById("bkBody");
+  const syncBody=()=>{ t.checked=BRAND.on; body.style.display=BRAND.on?"block":"none"; };
+  t.addEventListener("change",()=>{ BRAND.on=t.checked; syncBody(); saveBrand(); render(); });
+  const wire=(id,key)=>{
+    const el=document.getElementById(id);
+    el.value=BRAND[key]||"";
+    const upd=()=>{ BRAND[key]=el.value.trim(); saveBrand(); render(); };
+    el.addEventListener("input",upd); el.addEventListener("change",upd);
+  };
+  wire("bk_name","name"); wire("bk_hex","hex"); wire("bk_aesthetic","aesthetic"); wire("bk_palette","palette"); wire("bk_ar","ar");
+  syncBody();
+}
+
+/* ---- today's style: date-seeded pick from the 28 aesthetics ---- */
+function todaysStyle(){
+  const keys=Object.keys(AESTHETICS), d=new Date();
+  return keys[(d.getFullYear()*372 + d.getMonth()*31 + d.getDate()) % keys.length];
+}
+
+/* ---- first-visit instant aha: rotate three curated showcases ---- */
+function firstVisitShowcase(){
+  const SHOW=[["poster",1],["brand",2],["promo",1]];  // Neon Night Market / Liquid Tech / Launch Spotlight
+  const [cat,si]=SHOW[Math.floor(Date.now()/864e5)%SHOW.length];
+  if(cat!==state.category){
+    state.category=cat; state.cat={};
+    buildCats(); buildInspire(); buildKnobs();
+  }
+  state.model=CATEGORIES[cat].rec; syncModels();
+  const sd=SEEDS[cat][si];
+  const cfg=rollConfig(cat, sd);
+  applyConfig(cfg);
+  markSpark(document.querySelector('#inspire .spark[data-i="'+si+'"]'));
+  pushHistory(cfg, sd.name, cat);
+}
+
+function hideHint(remember){
+  document.getElementById("dialectHint").hidden=true;
+  if(remember){ hintDismissed=true; persist(); }
+}
+
+function restoreSaved(sv){
+  if(Array.isArray(sv.locks)) state.locks=new Set(sv.locks);
+  if(Array.isArray(sv.history)){
+    state.history=sv.history;
+    state.history.forEach(h=>{ if(typeof h.id==="number") histSeq=Math.max(histSeq,h.id); });
+  }
+  loadConfig(sv.config);
+  state.activeHist = sv.activeHist??null;
+  renderHistory();
+}
+
+/* ============================================================
+   SOCIAL PROOF — reviews, honest user count, and the globe.
+   ============================================================ */
+function realReviews(){ return REVIEWS.filter(r=>!r.sample && r.quote && r.quote.trim()); }
+
+function renderProof(){
+  const real = realReviews();
+  const show = real.length ? real : REVIEWS;          // samples render only as a styled preview
+  const sec = document.getElementById("proofSection");
+  /* Visitors only see this once at least one review is REAL — never fabricate proof. */
+  sec.hidden = real.length === 0;
+  const row = document.getElementById("reviewRow");
+  row.innerHTML = "";
+  show.forEach(r=>{
+    const d=document.createElement("div");
+    d.className="review";
+    const stars="★★★★★".slice(0, Math.max(1, Math.min(5, r.stars||5)));
+    d.innerHTML =
+      (r.sample? '<span class="sample-tag">sample</span>':'')+
+      '<div class="stars">'+stars+'</div>'+
+      '<div class="rq"></div>'+
+      '<div class="rby"></div>';
+    d.querySelector(".rq").textContent = '“'+r.quote+'”';
+    d.querySelector(".rby").textContent = "— "+r.by;
+    row.appendChild(d);
+  });
+  const realJobs = JOBS.filter(j=>!j.sample).length;
+  const cnt=document.getElementById("proofCount");
+  cnt.textContent = realJobs? realJobs+" shared from the community" : "";
+}
+
+/* Honest count: a verified override if you have one, else the real local/live
+   session tally. Only shown once it passes a credibility floor, and always
+   phrased as sessions — never invented "users". */
+function renderCountChip(){
+  const chip=document.getElementById("countChip");
+  let n = (typeof USER_COUNT_OVERRIDE==="number" && USER_COUNT_OVERRIDE>0) ? USER_COUNT_OVERRIDE : sessions;
+  const verified = typeof USER_COUNT_OVERRIDE==="number" && USER_COUNT_OVERRIDE>0;
+  if(verified){
+    chip.hidden=false;
+    chip.textContent = n.toLocaleString()+" creators and counting";
+  } else if(sessions>=5){
+    chip.hidden=false;
+    chip.textContent = "session #"+sessions.toLocaleString()+" on this device";
+  } else {
+    chip.hidden=true;
+  }
+}
+
+/* ---- globe of pins: lightweight 3D point projection on canvas ---- */
+let globeState={rot:0, raf:null, paused:false, hoverPause:false};
+/* The globe renders the JOBS array directly — you edit that array by hand
+   (see the big "HOW TO ADD A PIN" note above it). Sample pins show until
+   you replace them with real submissions sent to @imagend.app. */
+function loadJobs(){
+  return JOBS.filter(j=>isFinite(+j.lat)&&isFinite(+j.lng))
+             .map(j=>({lat:+j.lat,lng:+j.lng,loc:j.loc||"",cap:j.cap||"",by:j.by||"",img:j.img||"",model:j.model||"",category:j.category||""}));
+}
+
+/* ---- collapsible sections: persistent, accessible, animated ---- */
+/* Per-section status:
+   - never opened        -> neutral (calm grey)
+   - opened, not yet done -> pending (red)
+   - done                 -> green
+   Each section remembers its own "opened" state, independent of the others. */
+
+function initCollapsibles(){
+  document.querySelectorAll("[data-collapsible]").forEach(sec=>{
+    const head=sec.querySelector(".sec-head");
+    const body=sec.querySelector(".sec-body");
+    if(!head||!body) return;
+    const ckey=sec.getAttribute("data-collapse-key");
+    const dkey=sec.getAttribute("data-done-key");
+    const doneMode=sec.getAttribute("data-done-mode")||"check";  // "check" = Done pill; "action" = green on copy/save
+    const COL="imagend:collapse:"+ckey;
+    const DON=dkey ? "imagend:done:"+dkey : null;
+    const OPN=dkey ? "imagend:opened:"+dkey : null;   // has this section ever been opened?
+    const doneCb=sec.querySelector(".done-toggle input");
+    const usesGlow = dkey && doneMode==="check";       // only checkbox sections get the red/green glow
+
+    const open=(animate)=>{
+      sec.classList.remove("is-collapsed");
+      head.setAttribute("aria-expanded","true");
+      body.style.maxHeight=body.scrollHeight+"px";
+      if(animate) setTimeout(()=>{ if(!sec.classList.contains("is-collapsed")) body.style.maxHeight="none"; },320);
+      else body.style.maxHeight="none";
+    };
+    const close=(animate)=>{
+      if(animate){
+        body.style.maxHeight=body.scrollHeight+"px";
+        requestAnimationFrame(()=>{ sec.classList.add("is-collapsed"); head.setAttribute("aria-expanded","false"); });
+      }else{
+        sec.classList.add("is-collapsed"); head.setAttribute("aria-expanded","false"); body.style.maxHeight="0px";
+      }
+    };
+    sec._open=()=>open(true);   // exposed so copy/save can pop the prompt open if needed
+
+    /* ---- per-section status paint (checkbox sections only) ---- */
+    function paintStatus(){
+      if(!usesGlow) return;                   // globe, action-mode, no-glow sections: skip
+      const done   = store.get(DON)==="1";
+      const opened = store.get(OPN)==="1";
+      sec.classList.toggle("is-done", done);
+      sec.classList.toggle("is-pending", !done && opened);
+      sec.classList.toggle("is-neutral", !done && !opened);
+      if(doneCb) doneCb.checked = done;
+    }
+    if(usesGlow){ paintStatus(); sec._repaint=paintStatus; }
+
+    function markOpened(){
+      if(usesGlow && store.get(OPN)!=="1"){ store.set(OPN,"1"); paintStatus(); }
+    }
+
+    /* ---- restore collapsed state ----
+       data-default-collapsed forces closed-first; else checkbox input
+       sections default closed, everything else (globe) defaults open. */
+    const savedCol = store.get(COL);
+    let startCollapsed;
+    if(savedCol==="open") startCollapsed=false;
+    else if(savedCol==="closed") startCollapsed=true;
+    else startCollapsed = sec.getAttribute("data-default-collapsed")==="1" || !!dkey;
+    if(startCollapsed) close(false); else open(false);
+
+    /* header click toggles open/closed (ignore clicks on the done pill) */
+    head.addEventListener("click",e=>{
+      if(e.target.closest(".done-toggle")) return;
+      if(sec.classList.contains("is-collapsed")){ open(true); store.set(COL,"open"); markOpened(); }
+      else { close(true); store.set(COL,"closed"); }
+    });
+
+    /* done checkbox: tick -> green + auto-collapse; untick -> red + (re)open */
+    if(doneCb && usesGlow){
+      doneCb.addEventListener("change",()=>{
+        const done=doneCb.checked;
+        if(DON) store.set(DON, done?"1":"0");
+        if(done){ if(OPN) store.set(OPN,"1"); paintStatus(); close(true); store.set(COL,"closed"); }
+        else { paintStatus(); open(true); store.set(COL,"open"); markOpened(); }
+      });
+    }
+
+    sec._recalc=()=>{ if(!sec.classList.contains("is-collapsed")) body.style.maxHeight="none"; };
+    window.addEventListener("resize",()=>{ if(!sec.classList.contains("is-collapsed")) body.style.maxHeight="none"; });
+  });
+}
+
+function initGlobe(){
+  const cv=document.getElementById("globe");
+  if(!cv || typeof cv.getContext!=="function") return;
+  const ctx=cv.getContext("2d");
+  if(!ctx) return;
+  const R=cv.width, cx=R/2, cy=R/2, rad=R*0.42;
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+  const layer=document.getElementById("pinLayer");
+
+  let pins = [];   // built once, after loadJobs resolves
+  function buildPins(jobs){
+    layer.innerHTML = "";
+    pins = jobs.map(job=>{
+      const el=document.createElement("button");
+      el.className="pin"; el.type="button";
+      el.setAttribute("aria-label", "Job in "+(job.loc||"unknown"));
+      if(job.img){ const im=document.createElement("img"); im.className="pin-thumb"; im.src=job.img; im.alt=""; el.appendChild(im); }
+      el.addEventListener("click",e=>{ e.stopPropagation(); openJob(job); });
+      el.addEventListener("mouseenter",()=>globeState.hoverPause=true);
+      el.addEventListener("mouseleave",()=>globeState.hoverPause=false);
+      layer.appendChild(el);
+      return {job, el};
+    });
+    draw();
+  }
+
+  function toXYZ(lat,lng,rotY){
+    const phi=(90-lat)*Math.PI/180, th=(lng*Math.PI/180)+rotY;
+    return { x:Math.sin(phi)*Math.cos(th), y:Math.cos(phi), z:Math.sin(phi)*Math.sin(th) };
+  }
+  function draw(){
+    ctx.clearRect(0,0,R,R);
+    // sphere body
+    const g=ctx.createRadialGradient(cx-rad*0.3,cy-rad*0.35,rad*0.2, cx,cy,rad);
+    g.addColorStop(0,"#2a2150"); g.addColorStop(.6,"#161232"); g.addColorStop(1,"#0c0a1e");
+    ctx.beginPath(); ctx.arc(cx,cy,rad,0,7); ctx.fillStyle=g; ctx.fill();
+    ctx.strokeStyle="rgba(171,144,255,.25)"; ctx.lineWidth=1; ctx.stroke();
+    // graticule
+    ctx.strokeStyle="rgba(171,144,255,.12)";
+    for(let la=-60;la<=60;la+=30){
+      ctx.beginPath();
+      for(let lo=0;lo<=360;lo+=6){
+        const p=toXYZ(la,lo,globeState.rot);
+        if(p.z<0) continue;
+        const sx=cx+p.x*rad, sy=cy-p.y*rad;
+        lo===0?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy);
+      }
+      ctx.stroke();
+    }
+    for(let lo=0;lo<360;lo+=30){
+      ctx.beginPath();
+      for(let la=-90;la<=90;la+=6){
+        const p=toXYZ(la,lo,globeState.rot);
+        if(p.z<0) continue;
+        const sx=cx+p.x*rad, sy=cy-p.y*rad;
+        la===-90?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy);
+      }
+      ctx.stroke();
+    }
+    // place pins
+    pins.forEach(({job,el})=>{
+      const p=toXYZ(job.lat,job.lng,globeState.rot);
+      const front=p.z>=0;
+      el.classList.toggle("behind",!front);
+      const px=(cx+p.x*rad)/R*100, py=(cy-p.y*rad)/R*100;
+      el.style.left=px+"%"; el.style.top=py+"%";
+      el.style.zIndex= front? 2:0;
+    });
+  }
+  function tick(){
+    const collapsed = document.getElementById("globeSection")?.classList.contains("is-collapsed");
+    if(!collapsed){
+      if(!globeState.paused && !globeState.hoverPause) globeState.rot+=0.0032;
+      draw();
+    }
+    globeState.raf=requestAnimationFrame(tick);
+  }
+  draw();                       // sphere visible immediately, no empty/broken state
+  if(!reduce) tick();
+  buildPins(loadJobs());        // pins built once from the JOBS array
+
+  // drag to spin
+  let dragging=false, lastX=0;
+  const px2rot=dx=>dx/rad*1.4;
+  cv.addEventListener("pointerdown",e=>{dragging=true;lastX=e.clientX;globeState.paused=true;cv.setPointerCapture(e.pointerId);});
+  cv.addEventListener("pointermove",e=>{ if(!dragging)return; globeState.rot+=px2rot(e.clientX-lastX); lastX=e.clientX; draw(); });
+  const end=()=>{dragging=false;globeState.paused=false;};
+  cv.addEventListener("pointerup",end); cv.addEventListener("pointercancel",end);
+}
+function openJob(job){
+  const card=document.getElementById("jobCard");
+  const img=document.getElementById("jobImg");
+  if(job.img){ img.style.backgroundImage="url('"+job.img+"')"; img.style.display="block"; }
+  else { img.style.backgroundImage="none"; img.style.display="block"; }
+  document.getElementById("jobLoc").textContent=job.loc||"";
+  document.getElementById("jobCap").textContent=job.cap||"";
+  document.getElementById("jobBy").textContent=job.by? (job.by.charAt(0)==="@"||/send/i.test(job.by)? job.by : "by "+job.by) : "";
+  card.hidden=false;
+  globeState.paused=true;
+}
+function closeJob(){
+  document.getElementById("jobCard").hidden=true;
+  globeState.paused=false;
+}
+
+/* Optimized-prompt action status: green ring + green icon on the action you
+   took last (copy or save). Persists for the current prompt; resets when the
+   prompt text changes so green always means "this exact prompt was handled". */
+let promptActedFor = null;   // the prompt text that was last copied/saved
+function markPromptActed(which){
+  const sec=document.querySelector('[data-done-mode="action"]');
+  if(sec) sec.classList.add("is-acted");
+  const la=document.getElementById("lastAction");
+  if(la){ la.hidden=false; la.textContent = which==="save" ? "✓ Saved" : "✓ Copied"; }
+  const copyBtn=document.getElementById("copyBtn"), saveBtn=document.getElementById("saveBtn");
+  if(copyBtn) copyBtn.classList.toggle("acted", which==="copy");
+  if(saveBtn) saveBtn.classList.toggle("acted", which==="save");
+  promptActedFor = render._copy || "";
+}
+function resetPromptActed(){
+  const sec=document.querySelector('[data-done-mode="action"]');
+  if(sec) sec.classList.remove("is-acted");
+  const la=document.getElementById("lastAction"); if(la) la.hidden=true;
+  const copyBtn=document.getElementById("copyBtn"), saveBtn=document.getElementById("saveBtn");
+  if(copyBtn) copyBtn.classList.remove("acted");
+  if(saveBtn) saveBtn.classList.remove("acted");
+  promptActedFor=null;
+}
+
+function init(){
+  buildCats();
+  buildInspire();
+  buildKnobs();
+  syncModels();
+
+  document.getElementById("topSurpriseBtn").onclick=runSurprise;
+  document.getElementById("lazyGuideBtn").onclick=()=>lazySetOpen(true);
+  document.getElementById("lazyGuideClose").onclick=()=>lazySetOpen(false);
+  document.getElementById("lazyGuideModal").onclick=e=>{ if(e.target.id==="lazyGuideModal") lazySetOpen(false); };
+  document.getElementById("clearRackBtn").onclick=clearRack;
+  document.getElementById("howToBtn").onclick=()=>setHowTo(true);
+  document.getElementById("howToClose").onclick=()=>setHowTo(false);
+  document.getElementById("howToModal").onclick=e=>{ if(e.target.id==="howToModal") setHowTo(false); };
+  document.getElementById("howToTryBtn").onclick=()=>{ setHowTo(false); runSurprise(); };
+  document.getElementById("howToOwnBtn").onclick=()=>{ setHowTo(false); document.getElementById("idea").focus(); };
+  document.getElementById("promptTabBtn").onclick=()=>{ promptTab="prompt"; syncPromptPreview(buildIR()); };
+  document.getElementById("breakdownTabBtn").onclick=()=>{ promptTab="breakdown"; promptEditing=false; syncPromptPreview(buildIR()); };
+  document.getElementById("editPromptBtn").onclick=()=>{ if(!generatedPrompt)return; promptTab="prompt"; promptEditing=!promptEditing; if(promptEditing){ manualPrompt=manualPrompt||generatedPrompt; document.getElementById("promptEdit").value=manualPrompt; } syncPromptPreview(buildIR()); if(promptEditing)document.getElementById("promptEdit").focus(); };
+  document.getElementById("promptEdit").addEventListener("input",e=>{ manualPrompt=e.target.value; render._copy=manualPrompt||generatedPrompt; syncPromptPreview(buildIR()); resetPromptActed(); });
+  document.getElementById("resetPromptBtn").onclick=()=>{ manualPrompt=""; promptEditing=false; render._copy=generatedPrompt; syncPromptPreview(buildIR()); resetPromptActed(); toast("Reset to generated prompt"); };
+
+  document.getElementById("idea").addEventListener("input",e=>{ state.idea=e.target.value; render(); });
+
+  // style selects
+  const bind=(id,key)=>document.getElementById(id).addEventListener("change",e=>{
+    state.style[key]=e.target.value;
+    if(id==="s_palette"){ document.getElementById("hexWrap").style.display = e.target.value==="__hex"?"flex":"none"; }
+    render();
+  });
+  bind("s_mood","mood"); bind("s_palette","palette"); bind("s_light","light"); bind("s_medium","medium"); bind("s_ar","ar"); bind("s_aesthetic","aesthetic");
+  document.getElementById("s_hex").addEventListener("input",e=>{ state.style.hex=e.target.value; render(); });
+
+  // reference image
+  const refToggle=document.getElementById("refToggle"), refBody=document.getElementById("refBody");
+  refToggle.addEventListener("change",()=>{ state.reference.on=refToggle.checked; refBody.style.display=refToggle.checked?"block":"none"; render(); });
+  const refDrop=document.getElementById("refDrop"), refFile=document.getElementById("refFile"), refThumb=document.getElementById("refThumb"), refClear=document.getElementById("refClear");
+  const loadImg=file=>{ if(!file||!file.type.startsWith("image/"))return; const fr=new FileReader(); fr.onload=e=>{ refThumb.src=e.target.result; refDrop.classList.add("has"); refClear.style.display="flex"; }; fr.readAsDataURL(file); };
+  refDrop.addEventListener("click",e=>{ if(e.target!==refClear) refFile.click(); });
+  refFile.addEventListener("change",e=>loadImg(e.target.files[0]));
+  refDrop.addEventListener("dragover",e=>{ e.preventDefault(); refDrop.classList.add("drag"); });
+  refDrop.addEventListener("dragleave",()=>refDrop.classList.remove("drag"));
+  refDrop.addEventListener("drop",e=>{ e.preventDefault(); refDrop.classList.remove("drag"); loadImg(e.dataTransfer.files[0]); });
+  refClear.addEventListener("click",e=>{ e.stopPropagation(); refThumb.src=""; refDrop.classList.remove("has"); refClear.style.display="none"; refFile.value=""; });
+  document.getElementById("refBorrow").addEventListener("change",e=>{ state.reference.borrow=e.target.value; render(); });
+  document.querySelectorAll("#refStrength button").forEach(b=>{
+    b.onclick=()=>{ document.querySelectorAll("#refStrength button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); state.reference.strength=b.getAttribute("data-v"); render(); };
+  });
+
+  // detail segmented
+  document.querySelectorAll("#s_detail button").forEach(b=>{
+    b.onclick=()=>{ document.querySelectorAll("#s_detail button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); state.detail=b.getAttribute("data-v"); render(); };
+  });
+
+  // model toggle
+  document.querySelectorAll("#models button").forEach(b=>{
+    b.onclick=()=>{ state.model=b.getAttribute("data-m"); syncModels(); render(); hideHint(true); };
+  });
+
+  // negatives toggle — controls whether the avoid list is added to the copied prompt
+  const negToggle=document.getElementById("negToggle");
+  if(negToggle){
+    negToggle.checked = state.negOn;
+    negToggle.addEventListener("change",()=>{ state.negOn=negToggle.checked; render(); persist(); });
+  }
+
+  // lock toggles (delegated — covers static style fields + dynamic knobs)
+  document.addEventListener("click",e=>{
+    const lk=e.target.closest(".lock"); if(!lk) return;
+    const key=lk.getAttribute("data-lock");
+    state.locks.has(key) ? state.locks.delete(key) : state.locks.add(key);
+    refreshLockUI();
+    persist();
+  });
+
+  // copy
+  // gen-gate upgrade button + code redemption
+  const _gub=document.getElementById("genUpgradeBtn");
+  if(_gub) _gub.onclick=()=>window.parent.postMessage({type:_supaUser?"IMAGEND_UPGRADE":"IMAGEND_SIGNIN"},"*");
+  const _gcb=document.getElementById("genCodeBtn");
+  if(_gcb) _gcb.onclick=()=>{ const inp=document.getElementById("genCodeInput"); if(inp) redeemCode(inp.value); };
+
+  const cb=document.getElementById("copyBtn");
+  cb.onclick=()=>{
+    if(!render._copy||genLocked()){ render(); return; }
+    copyText(render._copy).then(()=>{
+      cb.classList.add("done");
+      cb.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+      setTimeout(()=>{ cb.classList.remove("done"); cb.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'; },1400);
+      markPromptActed("copy");
+      countUse("prompt");
+    }).catch(()=>toast("Couldn't reach the clipboard"));
+  };
+
+  // save to library / copy all / share
+  document.getElementById("saveBtn").onclick=()=>{
+    if(genLocked()){ render(); return; }
+    saveToLibrary(); markPromptActed("save");
+    countUse("prompt");
+  };
+  document.getElementById("copyAllBtn").onclick=()=>{
+    if(genLocked()){ render(); return; }
+    copyAllModels();
+    countUse("prompt");
+  };
+  document.getElementById("shareBtn").onclick=()=>{
+    const probe=buildIR();
+    if(!probe.subject && !probe.textContent){ toast("Type an idea first — the link carries your exact setup"); return; }
+    copyText(buildShareLink())
+      .then(()=>toast("Share link copied — it opens with this exact setup"))
+      .catch(()=>toast("Couldn't reach the clipboard"));
+  };
+
+  // dialect hint dismiss
+  document.getElementById("hintClose").onclick=()=>hideHint(true);
+
+  // brand kit
+  populateBrandKit();
+  loadBrand();
+  bindBrandKit();
+
+  // library
+  loadLibrary();
+  renderLibrary();
+
+  /* ---- boot: share link > saved session > first-visit showcase ---- */
+  const shared = readShareHash();
+  const saved  = readSavedState();
+  sessions = ((saved && saved.sessions) || 0) + 1;
+  hintDismissed = !!(saved && saved.hintDismissed);
+
+  if(shared){
+    applyShared(shared);
+    try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}
+    toast("Shared setup loaded");
+  } else if(saved && saved.config){
+    restoreSaved(saved);
+  } else {
+    render();
+    setTimeout(()=>setHowTo(true),220);
+    if(!hintDismissed) document.getElementById("dialectHint").hidden=false;
+  }
+
+  renderHistory();
+  refreshLockUI();
+  bootDone=true;
+
+  // social proof + globe (after sessions is known) — never let this block the app
+  try{
+    renderCountChip();
+    renderProof();
+    initGlobe();
+    document.getElementById("jobClose").onclick=closeJob;
+    document.getElementById("jobCard").addEventListener("click",e=>{ if(e.target.id==="jobCard") closeJob(); });
+  }catch(e){ /* social-proof UI is non-critical; the tool still works */ }
+
+  // collapsible/done system is core UI — run it on its own so a globe error can't skip it
+  try{ initCollapsibles(); }catch(e){}
+  try{ initPortal("imagend-video.html"); }catch(e){}
+
+  render();
+}
+/* ===== portal switch: animated door between the image and video worlds ===== */
+function initPortal(destHref){
+  const tab=document.getElementById("portalTab");
+  const veil=document.getElementById("portalVeil");
+  if(!tab||!veil) return;
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+  if(location.hash==="#portal"){
+    try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}
+    veil.classList.add("arrived");
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        veil.classList.add("closing");
+        setTimeout(()=>{ veil.className="portal-veil"; veil.setAttribute("aria-hidden","true"); }, reduce?260:1050);
+      });
+    });
+  }
+
+  tab.addEventListener("click",()=>{
+    if(reduce){ return; }
+    veil.setAttribute("aria-hidden","false");
+    veil.classList.add("opening");
+    setTimeout(()=>{}, 620);
+  });
+}
+
+if(document.readyState==="loading"){
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
+/* ============================================================
+   SUPABASE AUTH LAYER — real counters, real Pro status.
+   Parent wrapper sends session via postMessage after Google
+   OAuth. This module receives it, inits its own Supabase client
+   with the received tokens, and backs all gates against the DB.
+   ============================================================ */
+const SUPA_URL="https://bkrrrnpdopanjcaqrsce.supabase.co";
+const SUPA_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrcnJybnBkb3BhbmpjYXFyc2NlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDIxMzEsImV4cCI6MjA5Nzk3ODEzMX0.asRi9a2BC1WZkGM-uQ7CIFT0Ou5aATqjrF64iJ0Uu7c";
+const GUEST_LIMIT=2, DLG_FREE=3;
+const BETA_EXPIRY=Date.UTC(2026,9,31,23,0,0);
+let _supa=null, _supaUser=null, _status=null, _lastCounted="";
+
+/* ── Quota state (server is the source of truth; guests are counted on this device) ── */
+function _lagosDay(){ return new Date(Date.now()+3600e3).toISOString().slice(0,10); }
+function _guestUsed(){ try{ const d=JSON.parse(localStorage.getItem("imagend:guestUse")||"{}"); return d.day===_lagosDay()?(d.count||0):0; }catch(e){ return 0; } }
+function _guestInc(){ try{ localStorage.setItem("imagend:guestUse",JSON.stringify({day:_lagosDay(),count:_guestUsed()+1})); }catch(e){} }
+function isPro(){ return !!(_status&&_status.plan!=="free"); }
+function quotaUsed(){ return _supaUser ? (_status?_status.used:0) : _guestUsed(); }
+function quotaLimit(){ return _supaUser ? (_status?_status.limit:Infinity) : GUEST_LIMIT; } // if status can't load, don't block
+function genLocked(){ return quotaUsed()>=quotaLimit(); }
+function genLeft(){ return Math.max(0,quotaLimit()-quotaUsed()); }
+
+async function loadStatus(){
+  if(!_supa||!_supaUser) return;
+  try{ const {data,error}=await _supa.rpc("get_my_status"); if(error) throw error; _status=data; }
+  catch(e){ console.warn("[imagend] plan status unavailable",e); _status=null; }
+}
+// Count one prompt. Re-copying / saving the exact same prompt doesn't count twice.
+async function countUse(kind){
+  const key=String(render._copy||"");
+  if(key&&key===_lastCounted) return;
+  _lastCounted=key;
+  if(!_supaUser){ _guestInc(); render(); return; }
+  if(!_supa) return;
+  try{
+    const {data,error}=await _supa.rpc("consume_generation",{p_kind:kind||"prompt"});
+    if(error) throw error;
+    if(data&&data.status) _status=data.status;
+    if(data&&data.ok===false) toast(data.reason==="dialogue"?"Free Dialogue scenes used up":"Today's prompts are used up");
+    window.parent.postMessage({type:"IMAGEND_STATUS_CHANGED"},"*");
+  }catch(e){ console.warn("[imagend] usage count failed",e); }
+  render(); updateUserPill();
+}
+async function redeemCode(code){
+  const c=(code||"").trim(); if(!c) return;
+  if(!_supaUser||!_supa){ toast("Sign in first, then redeem your code"); return; }
+  try{
+    const {data,error}=await _supa.rpc("redeem_code",{p_code:c});
+    if(error) throw error;
+    _status=data; render(); updateUserPill();
+    toast("✓ Beta unlocked — Studio, 20 prompts a day until 31 October");
+    window.parent.postMessage({type:"IMAGEND_STATUS_CHANGED"},"*");
+  }catch(e){ toast((e&&e.message)||"That code isn't valid or has expired"); }
+}
+function updateGateCopy(){
+  const g=document.getElementById("genGate"); if(!g) return;
+  const t=g.querySelector(".pro-gate-title"), s=g.querySelector(".pro-gate-sub"),
+        b=document.getElementById("genUpgradeBtn"), row=g.querySelector(".gate-code-row");
+  if(!_supaUser){
+    t.textContent="You've used today's "+GUEST_LIMIT+" guest prompts";
+    s.textContent="Sign in with Google to keep going. Free accounts get 2 prompts a day; Creator 5; Studio 20.";
+    if(b) b.textContent="Sign in"; if(row) row.style.display="none"; return;
+  }
+  if(b) b.textContent="See plans";
+  if(row) row.style.display=(Date.now()<BETA_EXPIRY&&!isPro())?"":"none";
+  const lim=_status?_status.limit:0;
+  if(_status&&_status.team){ t.textContent="Your team has used today's "+lim+" shared prompts"; s.textContent="The pool resets at midnight, Lagos time. Any teammate who upgrades adds to the shared pool."; }
+  else if(isPro()){ t.textContent="You've used today's "+lim+" "+_status.plan_name+" prompts"; s.textContent="They reset at midnight, Lagos time. Need more? Move up to Studio (20 a day) or start a team to pool prompts."; }
+  else { t.textContent="You've used today's 2 free prompts"; s.textContent="Creator gives you 5 a day and Studio 20, across every model and category. Or come back tomorrow."; }
+}
+function updateUserPill(){
+  updateGateCopy();
+  const pill=document.getElementById("userPill"); if(!pill) return;
+  const esc=(x)=>String(x==null?"":x).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  if(_supaUser){
+    const em=_supaUser.email||"", d=em.length>28?em.slice(0,25)+"…":em;
+    let tier;
+    if(!_status) tier='<span class="up-free">Free</span>';
+    else if(_status.source==="comp") tier='<span class="up-pro">Owner ✦ unlimited</span>';
+    else tier='<span class="'+(isPro()?"up-pro":"up-free")+'">'+(_status.team?"Team · ":"")+esc(_status.plan_name)+(isPro()?" ✦":"")+" · "+genLeft()+" left today</span>";
+    pill.innerHTML='<span class="up-email">'+esc(d)+'</span>'+tier
+      +'<button class="up-signout" id="plansBtn">Plans &amp; team</button>'
+      +'<button class="up-signout" id="signOutBtn">Sign out</button>';
+    document.getElementById("plansBtn").onclick=()=>window.parent.postMessage({type:"IMAGEND_UPGRADE"},"*");
+    document.getElementById("signOutBtn").onclick=()=>window.parent.postMessage({type:"IMAGEND_SIGNOUT"},"*");
+  } else {
+    pill.innerHTML='<span class="up-free">Guest · '+genLeft()+' left today</span>'
+      +'<button class="up-signout" id="signInBtn">Sign in</button>';
+    document.getElementById("signInBtn").onclick=()=>window.parent.postMessage({type:"IMAGEND_SIGNIN"},"*");
+  }
+  pill.style.display="flex";
+}
+window.addEventListener("message",async function(e){
+  if(!e.data) return;
+  if(e.data.type==="IMAGEND_REFRESH"){ await loadStatus(); render(); updateUserPill(); return; }
+  if(e.data.type==="IMAGEND_SIGNEDOUT"){ _supaUser=null; _status=null; render(); updateUserPill(); return; }
+  if(e.data.type!=="IMAGEND_SESSION") return;
+  _supaUser=e.data.user;
+  if(!_supa) _supa=supabase.createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:false}});
+  try{ await _supa.auth.setSession({access_token:e.data.session.access_token,refresh_token:e.data.session.refresh_token}); }catch(ex){}
+  await loadStatus();
+  try{
+    const pc=localStorage.getItem("imagend:pendingCode")||localStorage.getItem("imagendv:pendingCode");
+    localStorage.removeItem("imagend:pendingCode"); localStorage.removeItem("imagendv:pendingCode");
+    if(pc) await redeemCode(pc);
+  }catch(ex){}
+  render(); updateUserPill();
+});
+</script>
+<!-- ── Voice typing: speak, review, then confirm before it fills the field ── -->
+<style>
+  .vt-mic[hidden],.vt-back[hidden],.vt-mode[hidden]{display:none!important}
+  .vt-mic{position:fixed;z-index:900;width:40px;height:40px;border-radius:12px;border:1px solid rgba(171,144,255,.45);
+    background:rgba(20,20,32,.96);color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 8px 24px -10px rgba(0,0,0,.7);transition:transform .15s var(--ease),background .15s var(--ease)}
+  .vt-mic:hover{background:rgba(171,144,255,.16);transform:translateY(-1px)}
+  .vt-mic:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .vt-mic svg{width:18px;height:18px}
+  .vt-back{position:fixed;inset:0;z-index:950;background:rgba(5,5,10,.78);backdrop-filter:blur(8px);display:flex;align-items:flex-end;justify-content:center;padding:16px}
+  @media(min-width:640px){.vt-back{align-items:center}}
+  .vt-card{width:min(560px,100%);background:linear-gradient(160deg,rgba(20,20,32,.995),rgba(12,10,26,.995));border:1px solid var(--line-strong);
+    border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:12px;color:var(--text);font-family:var(--ui);box-shadow:0 30px 80px -20px rgba(0,0,0,.8)}
+  .vt-top{display:flex;align-items:center;gap:12px}
+  .vt-dot{width:12px;height:12px;border-radius:50%;background:var(--muted-2);flex:none}
+  .vt-dot.on{background:#ff6f91;box-shadow:0 0 0 0 rgba(255,111,145,.6);animation:vtpulse 1.4s infinite}
+  @keyframes vtpulse{0%{box-shadow:0 0 0 0 rgba(255,111,145,.55)}70%{box-shadow:0 0 0 12px rgba(255,111,145,0)}100%{box-shadow:0 0 0 0 rgba(255,111,145,0)}}
+  @media(prefers-reduced-motion:reduce){.vt-dot.on{animation:none}}
+  .vt-title{font:700 18px var(--display);flex:1}
+  .vt-status{font:12px var(--mono);color:var(--muted)}
+  .vt-text{width:100%;min-height:120px;resize:vertical;background:var(--bg-2);border:1px solid var(--line-strong);border-radius:12px;
+    color:var(--text);font:15px/1.5 var(--ui);padding:12px 14px;outline:none;box-sizing:border-box}
+  .vt-text:focus{border-color:var(--accent)}
+  .vt-interim{min-height:20px;font:italic 14px/1.4 var(--ui);color:var(--muted)}
+  .vt-help{font-size:12.5px;color:var(--muted);line-height:1.5;margin:0}
+  .vt-mode{display:flex;gap:6px;flex-wrap:wrap}
+  .vt-mode label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);padding:6px 10px;border:1px solid var(--line-strong);border-radius:9px;cursor:pointer}
+  .vt-mode input{accent-color:var(--accent)}
+  .vt-err{font:12px/1.5 var(--mono);color:#ff8fa3;min-height:0}
+  .vt-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  .vt-btn{min-height:44px;padding:0 16px;border-radius:11px;border:1px solid var(--line-strong);background:transparent;color:var(--text);font:600 14px var(--ui);cursor:pointer}
+  .vt-btn:hover{border-color:var(--accent)}
+  .vt-btn.primary{background:var(--accent);border-color:var(--accent);color:#16121f}
+  .vt-btn[disabled]{opacity:.45;cursor:default}
+  .vt-btn.left{margin-right:auto}
+  .vt-btn:focus-visible,.vt-text:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+<script>
+(function(){
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR) return; // browser has no voice typing: no mic button, nothing changes
+  var TARGETS = '#idea, #lazyIdea, #lazyExactText, textarea[data-k], input[type="text"][data-k]';
+  var MIC_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5"/><path d="M8 22h8"/></svg>';
+  var field = null, rec = null, listening = false, base = "", lastFocused = null;
+
+  var mic = document.createElement("button");
+  mic.type = "button"; mic.className = "vt-mic"; mic.hidden = true;
+  mic.setAttribute("aria-label","Speak instead of typing"); mic.title = "Speak instead of typing";
+  mic.innerHTML = MIC_SVG;
+  document.body.appendChild(mic);
+  mic.addEventListener("mousedown", function(e){ e.preventDefault(); }); // keep the field focused
+  mic.addEventListener("click", function(){ if(field) openSheet(field); });
+
+  function place(){
+    if(!field || !document.body.contains(field)){ mic.hidden = true; return; }
+    var r = field.getBoundingClientRect();
+    if(r.width === 0 || r.bottom < 0 || r.top > innerHeight){ mic.hidden = true; return; }
+    var tall = field.tagName === "TEXTAREA" && r.height > 60;
+    mic.style.left = Math.max(8, Math.min(innerWidth - 48, r.right - 46)) + "px";
+    mic.style.top = Math.max(8, (tall ? r.bottom - 46 : r.top + (r.height - 40)/2)) + "px";
+    mic.hidden = false;
+  }
+  document.addEventListener("focusin", function(e){
+    var t = e.target;
+    if(t && t.matches && t.matches(TARGETS)){ field = t; lastFocused = t; place(); }
+    else if(t !== mic && !(sheet && sheet.contains(t))){ field = null; mic.hidden = true; }
+  });
+  document.addEventListener("focusout", function(){
+    setTimeout(function(){
+      var a = document.activeElement;
+      if(a !== mic && !(a && a.matches && a.matches(TARGETS))){ mic.hidden = true; }
+    }, 120);
+  });
+  addEventListener("scroll", function(){ if(!mic.hidden) place(); }, true);
+  addEventListener("resize", function(){ if(!mic.hidden) place(); });
+
+  /* ── The review sheet ── */
+  var sheet = null, txt, interim, dot, status, err, toggleBtn, modeWrap;
+  function buildSheet(){
+    sheet = document.createElement("div");
+    sheet.className = "vt-back"; sheet.hidden = true;
+    sheet.setAttribute("role","dialog"); sheet.setAttribute("aria-modal","true"); sheet.setAttribute("aria-labelledby","vtTitle");
+    sheet.innerHTML =
+      '<div class="vt-card">'+
+        '<div class="vt-top"><span class="vt-dot" id="vtDot" aria-hidden="true"></span><div class="vt-title" id="vtTitle">Speak your idea</div><span class="vt-status" id="vtStatus" aria-live="polite"></span></div>'+
+        '<label for="vtText" class="vt-help">Check the words below and fix anything it misheard. Nothing goes into the form until you tap <b>Use this text</b>.</label>'+
+        '<textarea class="vt-text" id="vtText"></textarea>'+
+        '<div class="vt-interim" id="vtInterim" aria-hidden="true"></div>'+
+        '<div class="vt-mode" id="vtMode" role="radiogroup" aria-label="Where should the text go">'+
+          '<label><input type="radio" name="vtMode" value="add" checked> Add to what\'s there</label>'+
+          '<label><input type="radio" name="vtMode" value="replace"> Replace it</label>'+
+        '</div>'+
+        '<div class="vt-err" id="vtErr" role="alert"></div>'+
+        '<div class="vt-row">'+
+          '<button type="button" class="vt-btn left" id="vtToggle">Pause</button>'+
+          '<button type="button" class="vt-btn" id="vtCancel">Cancel</button>'+
+          '<button type="button" class="vt-btn primary" id="vtUse">Use this text</button>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(sheet);
+    txt = sheet.querySelector("#vtText"); interim = sheet.querySelector("#vtInterim");
+    dot = sheet.querySelector("#vtDot"); status = sheet.querySelector("#vtStatus");
+    err = sheet.querySelector("#vtErr"); toggleBtn = sheet.querySelector("#vtToggle"); modeWrap = sheet.querySelector("#vtMode");
+    toggleBtn.onclick = function(){ listening ? stop() : start(); };
+    sheet.querySelector("#vtCancel").onclick = close;
+    sheet.querySelector("#vtUse").onclick = confirmText;
+    txt.addEventListener("input", function(){ base = txt.value; });
+    sheet.addEventListener("click", function(e){ if(e.target === sheet) close(); });
+    sheet.addEventListener("keydown", function(e){ if(e.key === "Escape"){ e.preventDefault(); close(); } });
+  }
+  function setState(on, msg){
+    listening = on;
+    dot.classList.toggle("on", on);
+    status.textContent = msg || (on ? "Listening…" : "Paused");
+    toggleBtn.textContent = on ? "Pause" : "Resume listening";
+  }
+  function start(){
+    err.textContent = "";
+    try{ if(rec){ rec.onend = null; rec.abort(); } }catch(e){}
+    rec = new SR();
+    rec.lang = navigator.language || "en-NG";
+    rec.continuous = true; rec.interimResults = true;
+    rec.onresult = function(e){
+      var live = "";
+      for(var i = e.resultIndex; i < e.results.length; i++){
+        var piece = e.results[i][0].transcript;
+        if(e.results[i].isFinal){
+          base = (base && !/\s$/.test(base) ? base + " " : base) + piece.trim();
+          txt.value = base;
+        } else live += piece;
+      }
+      interim.textContent = live;
+    };
+    rec.onerror = function(e){
+      var m = {
+        "not-allowed": "Microphone access is blocked. Allow the microphone for imagendai.com in your browser's site settings, then tap Resume listening.",
+        "service-not-allowed": "Voice typing isn't available in this browser. Type your idea instead.",
+        "no-speech": "Didn't catch anything. Tap Resume listening and speak again.",
+        "audio-capture": "No microphone was found on this device.",
+        "network": "Voice typing needs an internet connection. Check your data and try again."
+      }[e.error];
+      if(m) err.textContent = m;
+    };
+    rec.onend = function(){ interim.textContent = ""; setState(false); };
+    try{ rec.start(); setState(true); }catch(e){ setState(false); err.textContent = "Couldn't start the microphone. Try again."; }
+  }
+  function stop(){ try{ rec && rec.stop(); }catch(e){} setState(false); }
+  function openSheet(el){
+    if(!sheet) buildSheet();
+    field = el; base = ""; txt.value = ""; interim.textContent = ""; err.textContent = "";
+    var hasText = !!(el.value && el.value.trim());
+    modeWrap.hidden = !hasText;
+    modeWrap.querySelector('input[value="add"]').checked = true;
+    sheet.hidden = false; mic.hidden = true;
+    start();
+    setTimeout(function(){ toggleBtn.focus(); }, 30);
+  }
+  function close(){
+    stop();
+    try{ if(rec){ rec.onend = null; rec.abort(); } }catch(e){}
+    if(sheet) sheet.hidden = true;
+    if(lastFocused && document.body.contains(lastFocused)) lastFocused.focus();
+  }
+  function confirmText(){
+    var said = (txt.value || "").trim();
+    if(!said){ err.textContent = "There's no text yet. Speak, or type in the box."; return; }
+    var el = field;
+    if(!el || !document.body.contains(el)){ close(); return; }
+    var mode = (modeWrap.hidden ? "replace" : (modeWrap.querySelector("input:checked") || {}).value) || "replace";
+    var cur = el.value || "";
+    var next = mode === "add" && cur.trim() ? cur.replace(/\s*$/, "") + " " + said : said;
+    if(el.maxLength > 0 && next.length > el.maxLength) next = next.slice(0, el.maxLength);
+    el.value = next;
+    el.dispatchEvent(new Event("input", {bubbles:true}));
+    el.dispatchEvent(new Event("change", {bubbles:true}));
+    close();
+  }
+})();
+</script>
+</body>
+</html>

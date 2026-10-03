@@ -150,6 +150,8 @@
   .pm-members .who{color:var(--text);overflow:hidden;text-overflow:ellipsis}
   .pm-members .meta{font-family:var(--mono);font-size:11px;color:var(--muted)}
   #pmLeave{padding:0 18px}
+  .pm-fine{margin:12px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
+  .pm-fine a{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -175,7 +177,7 @@
       <div class="auth-legal">
         By signing up you agree to our
         <a href="/terms" target="_blank">Terms</a> and
-        <a href="/privacy" target="_blank">Privacy Policy</a>.
+        <a href="/privacy" target="_blank">Privacy Policy</a>. Paid plans: <a href="/refunds" target="_blank">Refund Policy</a>.
         No credit card required to start.
       </div>
     </div>
@@ -206,6 +208,7 @@
         <button type="button" data-cycle="yearly" aria-pressed="false">Yearly<span>2 months free</span></button>
       </div>
       <div class="pm-grid" id="pmGrid"></div>
+      <p class="pm-fine">Plans don't renew automatically. Full refund within 7 days if you've used fewer than 5 prompts. <a href="/refunds" target="_blank" rel="noopener">Refund policy</a> · <a href="/terms" target="_blank" rel="noopener">Terms</a></p>
       <div class="pm-msg" id="pmMsg" aria-live="polite"></div>
       <div class="pm-team" id="pmTeam"></div>
     </div>
