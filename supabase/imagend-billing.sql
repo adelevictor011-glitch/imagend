@@ -55,6 +55,8 @@ alter table public.profiles add column if not exists dialogue_uses_used int     
 alter table public.profiles add column if not exists redeemed_code      text;
 alter table public.profiles add column if not exists generations_used   int         not null default 0;
 alter table public.profiles add column if not exists pro_until          timestamptz;
+alter table public.profiles add column if not exists trial_until        timestamptz;
+alter table public.profiles add column if not exists trial_claimed_at   timestamptz;
 
 create unique index if not exists profiles_user_id_uidx on public.profiles(user_id);
 
@@ -88,12 +90,24 @@ drop policy if exists "own payments" on public.payments;
 create policy "own payments" on public.payments for select using (auth.uid() = user_id);
 grant select on public.payments to authenticated;
 
+-- ---------- 6b. Free-trial claims (one per account; device and network checked) ----------
+-- ip_hash / device_hash are keyed HMAC-SHA256 digests made on the server; raw IPs are never stored.
+create table if not exists public.trial_claims (
+  user_id     uuid primary key,
+  ip_hash     text not null,
+  device_hash text,
+  claimed_at  timestamptz not null default now()
+);
+create index if not exists trial_claims_ip_idx     on public.trial_claims(ip_hash, claimed_at);
+create index if not exists trial_claims_device_idx on public.trial_claims(device_hash);
+alter table public.trial_claims enable row level security;   -- no policies = invisible to users
+
 -- ---------- 7. Lock down direct writes ----------
 -- Users can READ their own profile, but can no longer edit plan, counters or codes
 -- from the browser. All changes go through the functions below.
 alter table public.profiles enable row level security;
 revoke insert, update, delete on public.profiles from anon, authenticated;
-revoke all on public.usage_daily, public.teams, public.comp_accounts from anon, authenticated;
+revoke all on public.usage_daily, public.teams, public.comp_accounts, public.trial_claims from anon, authenticated;
 drop policy if exists "read own profile" on public.profiles;
 create policy "read own profile" on public.profiles for select using (auth.uid() = user_id);
 grant select on public.profiles to authenticated;
@@ -130,6 +144,12 @@ begin
   if pr.plan in ('creator','studio') and pr.plan_until > now() then
     select pl.id, pl.name, pl.daily_limit into plan, plan_name, daily_limit from public.plans pl where pl.id = pr.plan;
     until := pr.plan_until; source := 'paid';
+  end if;
+
+  -- 14-day Creator trial
+  if pr.trial_until > now() and coalesce(daily_limit,0) < (select pl.daily_limit from public.plans pl where pl.id='creator') then
+    select pl.id, 'Creator trial', pl.daily_limit into plan, plan_name, daily_limit from public.plans pl where pl.id = 'creator';
+    until := pr.trial_until; source := 'trial';
   end if;
 
   -- Beta (Studio level) wins if it gives more
@@ -175,6 +195,9 @@ begin
     'limit', case when pr.team_id is not null then t_limit else ep.daily_limit end,
     'used',  case when pr.team_id is not null then t_used  else used_today     end,
     'dialogue_used', pr.dialogue_uses_used,
+    'trial_until', pr.trial_until,
+    'trial_available', (pr.trial_claimed_at is null and ep.source = 'free'
+                        and not exists (select 1 from public.payments x where x.user_id = uid)),
     'team', team_json
   );
 end $$;
@@ -320,10 +343,50 @@ begin
   if pr.plan = p_plan and pr.plan_until > now() then
     update public.profiles set plan_until = plan_until + step where user_id = p_user;     -- renew: add time
   else
-    update public.profiles set plan = p_plan, plan_until = now() + step where user_id = p_user; -- new / switched plan
+    -- new / switched plan. Buying Creator during a Creator trial starts the paid month when the trial ends.
+    update public.profiles set plan = p_plan,
+           plan_until = (case when p_plan = 'creator' and pr.trial_until > now() then pr.trial_until else now() end) + step
+     where user_id = p_user;
   end if;
   return json_build_object('applied', true, 'plan', p_plan,
     'until', (select plan_until from public.profiles where user_id = p_user));
+end $$;
+
+-- ---------- Free trial: ONLY the server (service role) can call this ----------
+-- Rules: one trial per account, never after a payment, one per device,
+-- and at most TRIAL_PER_NETWORK trials per network (IP) in 30 days.
+create or replace function public.apply_trial(p_user uuid, p_ip_hash text, p_device_hash text) returns json
+language plpgsql security definer set search_path = public as $$
+declare pr record; ep record; per_network constant int := 2; days constant int := 14; until_ts timestamptz;
+begin
+  if p_user is null or coalesce(p_ip_hash,'') = '' then raise exception 'missing user or network'; end if;
+  perform public._ensure_profile(p_user);
+  perform pg_advisory_xact_lock(hashtext('trial:'||p_ip_hash));
+  delete from public.trial_claims where claimed_at < now() - interval '12 months';   -- retention: 12 months
+  select * into pr from public.profiles where user_id = p_user for update;
+  select * into ep from public._effective_plan(p_user);
+
+  if pr.trial_claimed_at is not null or exists (select 1 from public.trial_claims where user_id = p_user) then
+    return json_build_object('ok', false, 'reason', 'already_claimed');
+  end if;
+  if exists (select 1 from public.payments where user_id = p_user) then
+    return json_build_object('ok', false, 'reason', 'paid_before');
+  end if;
+  if ep.source <> 'free' then
+    return json_build_object('ok', false, 'reason', 'plan_active', 'source', ep.source, 'until', ep.until);
+  end if;
+  if coalesce(p_device_hash,'') <> '' and exists (select 1 from public.trial_claims where device_hash = p_device_hash) then
+    return json_build_object('ok', false, 'reason', 'device_used');
+  end if;
+  if (select count(*) from public.trial_claims
+       where ip_hash = p_ip_hash and claimed_at > now() - interval '30 days') >= per_network then
+    return json_build_object('ok', false, 'reason', 'network_used');
+  end if;
+
+  until_ts := now() + make_interval(days => days);
+  insert into public.trial_claims (user_id, ip_hash, device_hash) values (p_user, p_ip_hash, nullif(p_device_hash,''));
+  update public.profiles set trial_until = until_ts, trial_claimed_at = now() where user_id = p_user;
+  return json_build_object('ok', true, 'until', until_ts);
 end $$;
 
 -- ---------- Who can call what ----------
@@ -331,6 +394,8 @@ revoke all on function public._effective_plan(uuid)        from public, anon, au
 revoke all on function public._ensure_profile(uuid)        from public, anon, authenticated;
 revoke all on function public.apply_payment(uuid,text,text,text,text,numeric,text) from public, anon, authenticated;
 grant execute on function public.apply_payment(uuid,text,text,text,text,numeric,text) to service_role;
+revoke all on function public.apply_trial(uuid,text,text) from public, anon, authenticated;
+grant execute on function public.apply_trial(uuid,text,text) to service_role;
 revoke all on function public.get_my_status()              from public, anon;
 revoke all on function public.consume_generation(text)     from public, anon;
 revoke all on function public.redeem_code(text)            from public, anon;

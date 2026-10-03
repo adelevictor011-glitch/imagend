@@ -18,6 +18,7 @@ Every setting outside the code, in one place. **Never put secret keys in this re
 | `FLW_PUBLIC_KEY` | no (shown to browsers) | Flutterwave → Settings → API Keys (Live) |
 | `FLW_SECRET_KEY` | **yes** | Flutterwave → Settings → API Keys (Live) |
 | `FLW_SECRET_HASH` | **yes** | A long password you invent. It must match Flutterwave's webhook "Secret hash" |
+| `TRIAL_HASH_SECRET` | **yes** (optional) | Another long password you invent, used to code IPs for the free trial. If missing, the service key is used. Once set, **don't change it**: old trial records would stop matching |
 
 After changing any variable: **Deployments → latest → ⋯ → Redeploy**. Vercel only reads variables at deploy time.
 
@@ -30,7 +31,7 @@ After changing any variable: **Deployments → latest → ⋯ → Redeploy**. Ve
   - Redirect URLs: `https://imagendai.com/**`, `https://www.imagendai.com/**`, `https://imagend.vercel.app/**`
   - `/**` means "this address and any page under it".
 - **Authentication → Providers → Google:** enabled.
-- **Database:** run `supabase/imagend-billing.sql` once in **SQL Editor**. It is safe to re-run; it only adds or replaces and never deletes data.
+- **Database:** run `supabase/imagend-billing.sql` in **SQL Editor**. Re-run the whole file whenever it changes; it is safe to re-run and never deletes your data. (The 3 Oct evening update added the free trial, so it must be re-run once.)
 - **Owner (free, unlimited) emails** are in table `comp_accounts`. See [Runbooks](04-runbooks.md) to add one.
 
 ## Flutterwave (Live mode)

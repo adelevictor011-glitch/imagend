@@ -47,6 +47,23 @@ on conflict (email) do nothing;
 ```
 To remove them: `delete from public.comp_accounts where email = 'person@gmail.com';`
 
+## Free trial: give, extend, end or reset one
+
+Give or extend a trial (e.g. a customer the network rule blocked):
+```sql
+update public.profiles set trial_until = now() + interval '14 days', trial_claimed_at = coalesce(trial_claimed_at, now())
+where user_id = (select id from auth.users where lower(email) = 'customer@gmail.com');
+```
+End one early: `update public.profiles set trial_until = now() where user_id = (select id from auth.users where lower(email)='…');`
+
+See who has trials: `select u.email, p.trial_until from public.profiles p join auth.users u on u.id=p.user_id where p.trial_claimed_at is not null order by p.trial_claimed_at desc;`
+
+Change the network limit (default 2 per 30 days) or trial length (14 days): edit `per_network` / `days` in `apply_trial` in `supabase/imagend-billing.sql` and re-run the file.
+
+## Announce an update (What's new)
+
+In `index.html`, find `var WHATS_NEW=` and change `version` to today's date (e.g. `"2026-11-02"`), the `title`, and the `items` (icon, heading, one sentence each). A new version makes the pop-up show again for everyone, including people who ticked "Don't show this again" last time. Keep it to 3–4 items.
+
 ## Change prices or daily limits
 ```sql
 update public.plans set price_monthly = 6000, price_yearly = 60000, daily_limit = 5 where id = 'creator';

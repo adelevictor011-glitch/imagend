@@ -544,7 +544,7 @@
   <section class="hero" data-collapsible data-collapse-key="hero" data-default-collapsed="1">
     <button class="sec-head hero-head" type="button" aria-expanded="false">
       <span class="sec-titles">
-        <h2>One idea. <em>Five model dialects.</em> Zero guesswork.</h2>
+        <h2>One idea. <em>Nine model dialects.</em> Zero guesswork.</h2>
         <span class="hero-tagline"><b>Imagend writes the prompt — you get the image.</b> <span class="readmore">Read more</span></span>
       </span>
       <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
@@ -584,7 +584,7 @@
         <div class="sec-body">
           <div class="idea-field">
             <div class="idea-head"><span class="idea-pin-lab">Pin to keep on every roll</span><button class="lock" data-lock="idea" title="Pin this field"></button></div>
-            <div class="idea-cta">Type your idea below — watch it become five expert prompts, instantly.</div>
+            <div class="idea-cta">Type your idea below — watch it become nine expert prompts, instantly.</div>
             <textarea id="idea" placeholder="e.g. a sneaker brand hero shot of a glowing white trainer floating over wet concrete at night"></textarea>
           </div>
 
@@ -731,18 +731,22 @@
         </div>
         <div class="sec-body">
           <div class="models" id="models">
-            <button data-m="mj">Midjourney<span class="sub">v7 · params</span><span class="rec">best</span></button>
-            <button data-m="nb">Nano Banana<span class="sub">/ GPT-Image</span><span class="rec">best</span></button>
-            <button data-m="id">Ideogram<span class="sub">text · logos</span><span class="rec">best</span></button>
-            <button data-m="fl">Flux<span class="sub">1.1 · dense</span><span class="rec">best</span></button>
-            <button data-m="rc">Recraft<span class="sub">brand · vector</span><span class="rec">best</span></button>
+            <button data-m="mj">Midjourney<span class="sub">V8.2 · params</span><span class="rec">best</span></button>
+            <button data-m="nb">Nano Banana<span class="sub">2 · Pro</span><span class="rec">best</span></button>
+            <button data-m="gp">GPT Image<span class="sub">2.5 · briefs</span><span class="rec">best</span></button>
+            <button data-m="id">Ideogram<span class="sub">4.0 · text · logos</span><span class="rec">best</span></button>
+            <button data-m="fl">FLUX.2<span class="sub">dense · hex</span><span class="rec">best</span></button>
+            <button data-m="rc">Recraft<span class="sub">V4.1 · vector</span><span class="rec">best</span></button>
+            <button data-m="sd">Seedream<span class="sub">5.0 · design</span><span class="rec">best</span></button>
+            <button data-m="qw">Qwen Image<span class="sub">3.0 · layouts</span><span class="rec">best</span></button>
+            <button data-m="gk">Grok Imagine<span class="sub">2.0 · fast</span><span class="rec">best</span></button>
           </div>
-          <div class="hint" id="dialectHint" hidden>Same idea, five dialects — <b>click through</b><button id="hintClose" aria-label="Dismiss hint">✕</button></div>
+          <div class="hint" id="dialectHint" hidden>Same idea, nine dialects — <b>click through</b><button id="hintClose" aria-label="Dismiss hint">✕</button></div>
           <div class="out-body">
             <div class="gen-gate" id="genGate" style="display:none">
               <div class="pro-gate-ic">✦</div>
               <div class="pro-gate-title">You've used your 5 free prompts</div>
-              <div class="pro-gate-sub">Upgrade to Pro for unlimited image and video prompts across all 5 models.</div>
+              <div class="pro-gate-sub">Upgrade to Pro for unlimited image and video prompts across all 9 image models.</div>
               <button class="pro-gate-btn" id="genUpgradeBtn">See plans</button>
               <div class="gate-code-row"><input class="gate-code-input" id="genCodeInput" type="text" placeholder="Have a beta code?"><button class="gate-code-btn" id="genCodeBtn">Redeem</button></div>
             </div>
@@ -781,7 +785,7 @@
             </div>
             <div class="why" id="why"></div>
             <div class="out-actions">
-              <button class="act-ghost" id="copyAllBtn">⧉ Copy all 5 models</button>
+              <button class="act-ghost" id="copyAllBtn">⧉ Copy all 9 models</button>
               <button class="act-share" id="shareBtn">Share setup</button>
             </div>
           </div>
@@ -1087,7 +1091,7 @@ const CATEGORIES = {
   }
 };
 
-const MODEL_NAME = {mj:"Midjourney", nb:"Nano Banana / GPT-Image", id:"Ideogram", fl:"Flux", rc:"Recraft"};
+const MODEL_NAME = {mj:"Midjourney", nb:"Nano Banana", gp:"GPT Image", id:"Ideogram", fl:"FLUX.2", rc:"Recraft", sd:"Seedream", qw:"Qwen Image", gk:"Grok Imagine"};
 
 /* ============================================================
    INSPIRE — curated seeds + guarded randomizer
@@ -1571,7 +1575,7 @@ function serializeMJ(ir){
   params.push("--ar "+ir.ar);
   params.push("--stylize "+(ir.mjStylize ?? STYLIZE[ir.detail]));
   if(ir.mjRaw) params.push("--style raw");
-  params.push("--v 6.1");
+  params.push("--v 8.2");
   const neg = ir.negatives.join(", ");
 
   return {
@@ -1618,7 +1622,7 @@ function serializeID(ir){
   if(ir.textContent){
     s += 'The text "'+ir.textContent+'"';
     s += ir.typoStyle? " in "+ir.typoStyle+" typography" : "";
-    s += ", displayed prominently and spelled correctly";
+    s += ", professional designed typography, displayed prominently and spelled correctly";
     s += ir.subText? '; smaller text reading "'+ir.subText+'". ' : ". ";
   }
   if(ir.composition.length) s += cap(ir.composition.join(", "))+". ";
@@ -1637,7 +1641,81 @@ function serializeID(ir){
   };
 }
 
-const SERIALIZE = {mj:serializeMJ, nb:serializeNB, id:serializeID, fl:serializeFL, rc:serializeRC};
+/* ---- category purpose — Seedream and GPT Image do better when told what the image is FOR ---- */
+function purposeLine(ir){
+  return ({poster:"a poster", brand:"a brand image", ugc:"an authentic phone-shot social photo", logo:"a logo", promo:"a promotional ad creative"})[state.category] || "an image";
+}
+
+/* skip the medium when it only repeats the purpose ("a poster, poster design") */
+function mediumAdds(ir){ const noun=purposeLine(ir).split(" ").pop(); return !!ir.medium && ir.medium.toLowerCase().indexOf(noun)<0; }
+
+// ---- GPT Image 2.5: labelled brief — it follows structured instructions and renders text verbatim ----
+function serializeGP(ir){
+  const L=[];
+  L.push("Create "+purposeLine(ir)+(ir.subject? ": "+ir.subject : "")+".");
+  L.push("Style: "+cap(ir.medium)+(ir.descriptors.length? "; "+ir.descriptors.slice(0,10).join(", ") : "")+".");
+  if(ir.composition.length) L.push("Composition: "+ir.composition.join(", ")+".");
+  const look=[ir.lighting, ir.palette, ir.mood? ir.mood+" mood" : ""].filter(Boolean);
+  if(look.length) L.push("Lighting and colour: "+look.join("; ")+".");
+  if(ir.textContent){
+    L.push('Text (render exactly, nothing else): "'+ir.textContent+'"'+(ir.subText? ' and smaller "'+ir.subText+'"' : "")+(ir.typoStyle? ", in "+ir.typoStyle+" typography" : "")+".");
+  }
+  L.push("Aspect ratio: "+ir.ar+".");
+  const body=L.join("\n");
+  const neg=ir.negatives.join(", ");
+  return { body, params:["aspect "+ir.ar], negDisplay:neg, negMode:"Avoid", full: body+(neg? "\nAvoid: "+neg+"." : "") };
+}
+
+// ---- Seedream 5.0: purpose first, then natural description; text in double quotes ----
+function serializeSD(ir){
+  let s="Design "+purposeLine(ir)+(ir.subject? " showing "+ir.subject : "")+(mediumAdds(ir)? ", "+ir.medium : "")+". ";
+  if(ir.composition.length) s += cap(ir.composition.join(", "))+". ";
+  const looks=ir.descriptors.slice(0,10).join(", ");
+  if(looks) s += cap(looks)+". ";
+  if(ir.lighting) s += cap(ir.lighting)+". ";
+  if(ir.palette) s += cap(ir.palette)+". ";
+  if(ir.mood) s += cap(ir.mood)+" mood. ";
+  if(ir.textContent) s += 'The words "'+ir.textContent+'"'+(ir.subText? ' and "'+ir.subText+'"' : "")+" appear clearly"+(ir.typoStyle? " in "+ir.typoStyle+" lettering" : "")+". ";
+  s += "Aspect ratio "+ir.ar+".";
+  const neg=ir.negatives.join(", ");
+  return { body:s.trim(), params:["aspect "+ir.ar], negDisplay:neg, negMode:"Avoid", full: s.trim()+(neg? " Avoid: "+neg+"." : "") };
+}
+
+// ---- Qwen Image 3.0: artifact → hierarchy → text priority → visual constraints ----
+function serializeQW(ir){
+  const L=[];
+  L.push(cap(purposeLine(ir).replace(/^an? /,""))+(mediumAdds(ir)? ", "+ir.medium : "")+".");
+  if(ir.subject) L.push("Main subject: "+ir.subject+".");
+  if(ir.textContent){
+    L.push('Headline text, largest and exactly as written: "'+ir.textContent+'".');
+    if(ir.subText) L.push('Secondary text, smaller: "'+ir.subText+'".');
+    if(ir.typoStyle) L.push("Typography: "+ir.typoStyle+", sharp and legible.");
+  }
+  if(ir.composition.length) L.push("Layout: "+ir.composition.join(", ")+".");
+  const look=[ir.descriptors.slice(0,10).join(", "), ir.lighting, ir.palette, ir.mood? ir.mood+" mood" : ""].filter(Boolean);
+  if(look.length) L.push("Visual style: "+look.join("; ")+".");
+  L.push("Aspect ratio "+ir.ar+".");
+  const body=L.join(" ");
+  const neg=ir.negatives.join(", ");
+  return { body, params:["aspect "+ir.ar], negDisplay:neg, negMode:"Avoid", full: body+(neg? " Avoid: "+neg+"." : "") };
+}
+
+// ---- Grok Imagine 2.0: one vivid descriptive paragraph; ratio is picked in the app ----
+function serializeGK(ir){
+  let s = cap(ir.medium)+(ir.subject? " of "+ir.subject : "");
+  if(ir.composition.length) s += ", "+ir.composition.join(", ");
+  s += ". ";
+  const looks=ir.descriptors.slice(0,9).join(", ");
+  if(looks) s += cap(looks)+". ";
+  const look=[ir.lighting, ir.palette, ir.mood? ir.mood+" mood" : ""].filter(Boolean);
+  if(look.length) s += cap(look.join(", "))+". ";
+  if(ir.textContent) s += 'Clear legible text reading "'+ir.textContent+'". ';
+  const body=s.trim();
+  const neg=ir.negatives.join(", ");
+  return { body, params:["set ratio "+ir.ar+" in Grok"], negDisplay:neg, negMode:"Avoid", full: body+(neg? " Avoid: "+neg+"." : "") };
+}
+
+const SERIALIZE = {mj:serializeMJ, nb:serializeNB, gp:serializeGP, id:serializeID, fl:serializeFL, rc:serializeRC, sd:serializeSD, qw:serializeQW, gk:serializeGK};
 
 /* reference-image mode: rewrite a serializer's output so the target model uses an attached image */
 function decorateReference(model, ser, ir){
@@ -1647,11 +1725,17 @@ function decorateReference(model, ser, ir){
   const word  = {subtle:"loosely", bal:"closely", strong:"very closely"}[r.strength];
   if(model==="mj"){
     const w = {subtle:30, bal:60, strong:100}[r.strength];
-    const flag = (r.borrow==="style"||r.borrow==="color")
-      ? ("--sref <paste image URL> --sw "+w)
-      : ("--cref <paste image URL> --cw "+w);
-    ser.params = [...ser.params, flag];
-    ser.full   = ser.full + " " + flag;
+    if(r.borrow==="style"||r.borrow==="color"){
+      const flag = "--sref <paste image URL> --sw "+w;
+      ser.params = [...ser.params, flag];
+      ser.full   = ser.full + " " + flag;
+    } else {
+      /* V8 dropped --cref: subject/composition go in as an image prompt with --iw */
+      const iw = {subtle:0.5, bal:1, strong:2}[r.strength];
+      ser.params = [...ser.params, "--iw "+iw];
+      ser.body = "<paste image URL> " + ser.body;
+      ser.full = "<paste image URL> " + ser.full + " --iw "+iw;
+    }
   } else {
     const strengthNum = {subtle:0.35, bal:0.6, strong:0.85}[r.strength];
     const prefix = model==="fl"
@@ -1660,6 +1744,8 @@ function decorateReference(model, ser, ir){
         ? "Remix the attached reference image, preserving its "+phrase+". "
         : model==="rc"
           ? "Use the attached image as a "+phrase+" reference. "
+          : model==="sd"||model==="qw"
+            ? "Reference image 1: keep its "+phrase+" "+word+". "
           : "Using the attached reference image, match its "+phrase+" "+word+". ";
     ser.body = prefix + ser.body;
     ser.full = prefix + ser.full;
@@ -1674,6 +1760,7 @@ function serializeFL(ir){
   let lead = cap(ir.medium||"image");
   if(ir.subject) lead += " of "+ir.subject;
   seg.push(lead);
+  if(ir.palette) ir = {...ir, palette: ir.palette.replace(/brand colour (#[0-9a-fA-F]{3,8})/, "color $1")};
   ir.composition.forEach(c=>seg.push(c));
   ir.descriptors.slice(0,12).forEach(d=>seg.push(d));
   if(ir.lighting) seg.push(ir.lighting);
@@ -1681,12 +1768,12 @@ function serializeFL(ir){
   if(ir.mood) seg.push(ir.mood+" atmosphere");
   if(ir.textContent) seg.push('with clear legible text reading "'+ir.textContent+'"');
   const body = seg.filter(Boolean).join(", ");
-  const neg = ir.negatives.join(", ");
+  /* FLUX.2 has no negative prompt — it reads "avoid X" as a request for X — so negatives are left out */
   return {
     body: body + ". Aspect ratio "+ir.ar+".",
     params:["aspect "+ir.ar],
-    negDisplay:neg, negMode:"Avoid",
-    full: body + ". Aspect ratio "+ir.ar+"." + (neg? " Avoid: "+neg+"." : "")
+    negDisplay:"", negMode:"Avoid",
+    full: body + ". Aspect ratio "+ir.ar+"."
   };
 }
 
@@ -1708,11 +1795,12 @@ function serializeRC(ir){
   if(ir.palette) s += cap(ir.palette)+". ";
   if(ir.lighting) s += cap(ir.lighting)+". ";
   if(ir.mood) s += cap(ir.mood)+" mood. ";
-  s += "Style: "+style+". Aspect ratio "+ir.ar+".";
+  s += ({vector_illustration:"Flat vector illustration", icon:"Simple vector icon", digital_illustration:"Digital illustration", realistic_image:"Realistic image"})[style]+". Aspect ratio "+ir.ar+".";
   const neg=ir.negatives.join(", ");
+  const variant = (style==="vector_illustration"||style==="icon") ? "V4.1 Vector" : "V4.1";
   return {
-    body:s.trim(), style:style,
-    params:["style "+style, "aspect "+ir.ar],
+    body:s.trim(), style:variant,
+    params:["model "+variant, "aspect "+ir.ar],
     negDisplay:neg, negMode:"Avoid",
     full: s.trim()+(neg? " Avoid: "+neg+"." : "")
   };
@@ -1720,11 +1808,15 @@ function serializeRC(ir){
 
 /* model-specific rationale */
 function rationale(model, ir){
-  if(model==="mj") return "Built for <b>Midjourney v7</b>: weighted comma phrases front-loaded by importance, plus structural params. <b>--stylize "+(ir.mjStylize ?? STYLIZE[ir.detail])+"</b> matches your detail level"+(ir.mjRaw? ", <b>--style raw</b> keeps it photoreal":"")+"; negatives ride in <b>--no</b>.";
-  if(model==="nb") return "Built for <b>Nano Banana / GPT-Image</b>: full natural-language scene description — these models read prose, not keyword soup. Negatives become an explicit <b>Avoid:</b> instruction since there's no negative param.";
-  if(model==="fl") return "Built for <b>Flux</b>: dense descriptive clauses without Midjourney-style params — Flux rewards rich detail in natural phrasing. Aspect ratio is stated plainly and negatives ride in an <b>Avoid:</b> line.";
-  if(model==="rc") return "Built for <b>Recraft</b>: a clean description plus an explicit <b>Style: "+recraftStyle(ir)+"</b> family — Recraft keys off its style system, which is why it holds brand and vector consistency. Text is flagged to render cleanly.";
-  return "Built for <b>Ideogram</b>: text-first phrasing — the in-image copy is quoted and flagged to spell correctly, which is why it's the pick for "+(state.category==="logo"?"logos":"text-heavy work")+".";
+  if(model==="gp") return "Built for <b>GPT Image 2.5</b>: a labelled brief — purpose, style, composition, lighting, then any text marked <b>render exactly</b>. It follows instructions like a designer reading a brief, so structure beats adjectives.";
+  if(model==="sd") return "Built for <b>Seedream 5.0</b>: it opens with what the image is <b>for</b> (\"Design a poster…\") because Seedream reasons from purpose, then describes the scene in plain sentences. Text sits in double quotes.";
+  if(model==="qw") return "Built for <b>Qwen Image 3.0</b>: written like a layout brief — artifact, main subject, text in order of size, then layout and style. Qwen handles long, structured briefs and small, multilingual text well.";
+  if(model==="gk") return "Built for <b>Grok Imagine 2.0</b>: one vivid descriptive paragraph. Pick the <b>"+ir.ar+"</b> ratio in Grok's ratio menu — it isn't read from the prompt.";
+  if(model==="mj") return "Built for <b>Midjourney V8.2</b>: detailed comma phrases front-loaded by importance, plus structural params. <b>--stylize "+(ir.mjStylize ?? STYLIZE[ir.detail])+"</b> matches your detail level (go to 1000 if you've trained a personalization profile). <b>--stylize "+(ir.mjStylize ?? STYLIZE[ir.detail])+"</b> matches your detail level"+(ir.mjRaw? ", <b>--style raw</b> keeps it photoreal":"")+"; negatives ride in <b>--no</b>.";
+  if(model==="nb") return "Built for <b>Nano Banana 2 / Pro</b>: full natural-language scene description — these models read prose, not keyword soup. Negatives become an explicit <b>Avoid:</b> instruction since there's no negative param.";
+  if(model==="fl") return "Built for <b>FLUX.2</b>: dense descriptive clauses, most important first — FLUX.2 weighs word order. Brand hex codes go in as <b>color #hex</b>. Negatives are left out on purpose: FLUX.2 has no negative prompt, and naming a thing tends to add it.";
+  if(model==="rc"){ const v=serializeRC(ir).style; return "Built for <b>Recraft "+v+"</b>: a clean description with the look stated in plain words. "+(v==="V4.1 Vector"? "Choose the <b>Vector</b> model in Recraft to get an editable SVG.":"Switch to Recraft's Vector model if you need an SVG.")+" Text is flagged to render cleanly."; }
+  return "Built for <b>Ideogram 4.0</b>: text-first phrasing — the in-image copy is quoted and flagged to spell correctly, which is why it's the pick for "+(state.category==="logo"?"logos":"text-heavy work")+".";
 }
 
 /* ============================================================
@@ -1760,7 +1852,7 @@ function render(){
   } else {
     // highlight quoted text
     disp = disp.replace(/&quot;([^&]*?)&quot;/g,'&quot;<span class="em">$1</span>&quot;');
-    disp = disp.replace(/(--ar [0-9:]+|Aspect ratio [0-9:]+|Style: [a-z_]+|--sref [^ ]+ --sw [0-9]+|--cref [^ ]+ --cw [0-9]+)/g,'<span class="par">$1</span>');
+    disp = disp.replace(/(--ar [0-9:]+|Aspect ratio [0-9:]+|Aspect ratio: [0-9:]+|--sref [^ ]+ --sw [0-9]+|--iw [0-9.]+)/g,'<span class="par">$1</span>');
   }
   pt.innerHTML = disp;
 
@@ -1772,6 +1864,7 @@ function render(){
   if(ir.aesthetic) chips.push('<span class="chip">style · <b>'+ir.aesthetic+'</b></span>');
   if(state.model==="mj") chips.push('<span class="chip">stylize · <b>'+(ir.mjStylize ?? STYLIZE[ir.detail])+'</b></span>');
   if(state.model==="rc" && ser.style) chips.push('<span class="chip">recraft · <b>'+ser.style+'</b></span>');
+  if(state.model==="gk") chips.push('<span class="chip">set in Grok · <b>'+ir.ar+'</b></span>');
   if(ir.reference && ir.reference.on) chips.push('<span class="chip">ref · <b>'+ir.reference.borrow+'</b></span>');
   if(ir.fixes && ir.fixes.length) chips.push('<span class="chip">⚖ fixes · <b>'+ir.fixes.length+'</b></span>');
   chips.push('<span class="chip">detail · <b>'+({min:"minimal",bal:"balanced",rich:"rich"})[ir.detail]+'</b></span>');
@@ -2315,16 +2408,16 @@ function beginRename(card,item){
   inp.addEventListener("click",ev=>ev.stopPropagation());
 }
 
-/* ---- copy all 5 model dialects in one labeled block ---- */
+/* ---- copy every model dialect in one labeled block ---- */
 function copyAllModels(){
   const probe=buildIR();
   if(!probe.subject && !probe.textContent){ toast("Type an idea first"); return; }
-  const txt=["mj","nb","id","fl","rc"].map(m=>{
+  const txt=Object.keys(SERIALIZE).map(m=>{
     const ir=buildIR();
     const ser=decorateReference(m, SERIALIZE[m](ir), ir);
     return MODEL_NAME[m]+"\n"+(state.negOn ? ser.full : stripNeg(ser.full, ser));
   }).join("\n\n");
-  copyText(txt).then(()=>toast("All 5 prompts copied")).catch(()=>toast("Couldn't reach the clipboard"));
+  copyText(txt).then(()=>toast("All "+Object.keys(SERIALIZE).length+" prompts copied")).catch(()=>toast("Couldn't reach the clipboard"));
 }
 
 /* ---- brand kit UI ---- */

@@ -125,6 +125,16 @@ A dated log of what was built, what broke, and why each decision was made. Newes
   - Recommended additions: GPT Image 2.5 and Seedream 5.0.
   - *Status: awaiting decision.*
 
+## 3 October 2026 (evening): nine models, free trial, What's new
+
+- **Refund wording tightened:** refunds happen only when the customer emails within 7 × 24 hours of the payment time, with a worked example. Never automatic.
+- **Image models: 5 → 9.**
+  - Updated: Midjourney **V8.2** (`--v 8.2`; V8 dropped `--cref`, so subject/composition references now use an image prompt with `--iw`), **Nano Banana 2 / Pro**, **Ideogram 4.0** (adds "professional designed typography"), **FLUX.2** (no negative prompt, so negatives are left out; brand hex goes in as `color #hex`), **Recraft V4.1** (styles are no longer a parameter; says when to pick the Vector model).
+  - Added: **GPT Image 2.5** (labelled brief), **Seedream 5.0** (purpose first: "Design a poster…"), **Qwen Image 3.0** (layout brief: artifact, subject, text by size, layout, style), **Grok Imagine 2.0** (one descriptive paragraph; ratio set in Grok's menu).
+  - GPT Image used to share a button with Nano Banana; it now has its own.
+- **What's new pop-up:** shows each visit until the user ticks "Don't show this again", and comes back for every new update. It can be reopened from Plans & team.
+- **14-day Creator trial** for accounts that have never paid. One per account, one per device, at most 2 per network in 30 days. Only coded (hashed) IPs are stored, never the real IP. Offered once after sign-in, and always available in Plans & team.
+
 ---
 
 ### Lessons worth remembering

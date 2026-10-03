@@ -43,6 +43,7 @@ Set up by `supabase/imagend-billing.sql`.
 | `teams` | Team name, owner, 6-character invite code |
 | `payments` | One row per Flutterwave transaction (`tx_id` is unique, so it can't be credited twice) |
 | `comp_accounts` | Owner emails with free unlimited access |
+| `trial_claims` | One row per free trial: user, hashed network, hashed device ID, date. Deleted after 12 months |
 
 Users can **read** their own profile and payments. They **cannot write** to anything. All changes go through these functions:
 
@@ -53,8 +54,9 @@ Users can **read** their own profile and payments. They **cannot write** to anyt
 | `redeem_code(code)` | signed-in user | BETATESTER → Studio until 31 Oct 2026 |
 | `create_team`, `join_team`, `leave_team`, `get_team_members` | signed-in user | Teams |
 | `apply_payment(...)` | **server only** (service role) | Checks the amount matches the price, records the payment, extends the plan |
+| `apply_trial(user, ip_hash, device_hash)` | **server only** | Starts the 14-day Creator trial if the account, device and network pass the rules |
 
-**How the effective plan is decided:** owner email → unlimited; otherwise the **higher** of an active beta code (Studio) and an active paid plan; otherwise Free. The paid plan is stored separately, so it reappears when the beta ends. On a team, the limit is the **sum of every member's limit**, and usage is the sum of everyone's usage that day.
+**How the effective plan is decided:** owner email → unlimited; otherwise the **highest** of an active paid plan, an active Creator trial and an active beta code (Studio); otherwise Free. The paid plan is stored separately, so it reappears when the beta ends. On a team, the limit is the **sum of every member's limit**, and usage is the sum of everyone's usage that day.
 
 ### 3. Payments: Flutterwave + `api/`
 
@@ -63,6 +65,7 @@ Users can **read** their own profile and payments. They **cannot write** to anyt
 | `api/config.js` | `GET /api/config` | Gives the app the **public** key (`FLW_PUBLIC_KEY`) |
 | `api/verify-payment.js` | `POST /api/verify-payment` | Called by the app with `transaction_id` or `tx_ref`. Checks the signed-in user, verifies with Flutterwave, applies the plan |
 | `api/flutterwave-webhook.js` | `POST /api/flutterwave-webhook` | Flutterwave's backup notice. Checks the `verif-hash` header, verifies, applies |
+| `api/claim-trial.js` | `POST /api/claim-trial` | Starts the free trial: checks the signed-in user, hashes their IP network and device ID, calls `apply_trial` |
 | `api/_lib.js` | (not a URL) | Shared helpers |
 
 **Payment reference format:** `imgnd_<plan>_<cycle>_<userId>_<timestamp>`, e.g. `imgnd_creator_monthly_<uuid>_1790000000000`. The server reads the plan, cycle and user **only from Flutterwave's verified record**, never from the browser. The database then checks that the amount matches the price.
@@ -73,6 +76,23 @@ Users can **read** their own profile and payments. They **cannot write** to anyt
 3. **Resume on next visit**: the app remembers each payment it starts and re-checks it by reference next time the user opens Imagend.
 
 The **webhook** covers anyone who never comes back at all.
+
+### 4. Free trial rules
+
+Think of it like a test drive at the dealership: one per customer. We check the customer's name (Google account), the car key they were handed (a random device ID in the browser) and the street they came from (the network's IP address).
+
+1. One trial per account, and never for an account that has paid before.
+2. Not while another plan (paid, beta or owner) is active, so a beta user can claim theirs after the beta ends.
+3. One per device ID.
+4. At most **2 per network in 30 days**. Several people can share one network in Lagos (an office, or a mobile carrier sharing one IP address across many phones), so a limit of 1 would block real customers.
+
+IPs and device IDs are turned into keyed hashes on the server (HMAC-SHA256) before they are stored, so the real values are never kept.
+
+**What it doesn't stop:** a determined person who switches to another network (mobile data, a VPN) *and* uses a fresh browser *and* a new Google account. That takes real effort for 14 days of a ₦5,000 plan, which is the point: raise the effort, don't punish shared networks.
+
+### 5. What's new pop-up
+
+`WHATS_NEW` in the shell lists the latest changes. It shows on each visit until the user ticks **Don't show this again**, which hides it only for that version. A new `version` makes it appear again for everyone.
 
 ## Security model and known limits
 
